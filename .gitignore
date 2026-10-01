@@ -1,0 +1,15 @@
+# 本地密钥与凭据
+*.keystore
+*.jks
+*.local.*
+CREDENTIALS*
+.env
+# 产物
+*.apk
+*.aab
+*.xapk
+*.pck
+__pycache__/
+*.pyc
+.godot/
+build/

@@ -1,0 +1,24 @@
+artifact:
+  file: "<原包文件名>"
+  sha256: "<sha256>"
+  package: "<包名>"
+  version: "<版本>"
+  engine: "<godot|unity-mono|unity-il2cpp|cocos|native|unknown>"
+
+authorization:
+  owner_confirmed: false
+  confirmed_by: ""
+  evidence: ""
+  scope: [static, device_observation]
+  out_of_scope: [server_side, redistribution]
+
+goal:
+  route: "R3"            # R1 原位恢复 / R2 部分逆向 / R3 纯重做（S4 D1 决定）
+  deliverables: [source_project, signed_apk, docs]
+  new_package_name: ""   # S4 D3 决定
+  brand: ""              # S4 D6 决定
+
+verification:
+  smoke_cmd: ""
+  tests_cmd: ""
+  device_serial: ""
