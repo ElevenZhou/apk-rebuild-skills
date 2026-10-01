@@ -24,7 +24,7 @@
 
 ```powershell
 # 1. 拉取（私有仓库，需要先被加为协作者）
-git clone https://github.com/<org>/apk-rebuild-skills.git D:/apk-rebuild-skills
+git clone https://github.com/ElevenZhou/apk-rebuild-skills.git D:/apk-rebuild-skills
 
 # 2. 安装：把 skills/* 链接到本机 Agent 的 skills 目录（目录联接，之后 git pull 就是更新）
 powershell -ExecutionPolicy Bypass -File D:/apk-rebuild-skills/install/install.ps1
