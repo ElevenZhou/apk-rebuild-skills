@@ -51,6 +51,23 @@ RN+Hermes 包**拿不回原始源码**（TS/JSX、注释、文件结构、局部
 3. **服务端不在包里**：RN 客户端重建后能否跑，取决于原后端是否在线、接口是否仍兼容。S0 必须问清服务端现状。
 4. 同一常量（2MB）在 bundle 里多次出现，多数来自第三方库的枚举表，不能按命中次数下结论。
 
+## 资源回导（S3，已验证（项目C））
+脚本：`rebuild-asset-recovery/scripts/rn/rn_asset_restore.py`、`i18n_extract.py`（详见该 skill 的 RN 小节）。
+
+| 资源 | 位置 | 还原方法 | 项目C 结果 |
+|---|---|---|---|
+| 图片（png/jpg/webp/gif） | `res/drawable-<密度>/<路径拼接小写去符号>.png` | 伪 JS 里 Metro `registerAsset({httpServerLocation,name,type,width,height,scales,fileHashes})` 对象字面量 → 还原原目录 + 原文件名 + `@2x` 后缀 | 220 张，fail 0 |
+| svg / pag / lottie json / 字体 | `res/raw/` | 同上，md5 = `fileHashes` 逐字节一致 | 51 个，全部原件 |
+| i18n | bundle 内 locale 模块（对象字面量链） | 解释 `rX = {...}` / `rA['k'] = rB` / `a4['exports'] = rX` | 9 语言 × ~1.9k 键 |
+| 启动图标 / 启动底色 | `mipmap-*`、`values/colors.xml`（`splashscreen_background`） | 直接拷贝 | OK |
+
+坑：
+1. **aapt2 会重压缩 PNG**：md5 对不上的 190/220 张像素尺寸一致 → 按资源名兜底并标 `OK_RECOMP`，不要判 FAIL。
+2. **XAPK/APKS 是按设备裁剪的分包**：多倍图在 `config.<密度>.apk`，只拿到一个密度；记 `PARTIAL`。要全密度需 AAB 或从多台设备取。
+3. 包里有、JS 里没引用的"孤儿"资源（项目C 42 个，含 emoji gif），可能是服务端下发资源的本地副本 → 单独目录、路径标 inferred。
+4. Expo 包常带 Apple **SF Pro** 字体（name 表含 Apple 许可），Android 上不可再分发 → 重建必须替换。
+5. 第三方 SDK 资源（AppLovin、Firebase、ExoPlayer、`node_modules_*`）不导入，随依赖安装。
+
 ## 开发（S5）
 - 推荐：最新 Expo 模板 + 同版本主要依赖（从 app.config plugins 和 bundle 内嵌 github 链接反推依赖清单）。（未验证）
 - 冒烟：`npx expo export` 能打出 bundle 即视为编译通过；`npx expo run:android --variant release` 真机冒烟。（未验证）
@@ -60,3 +77,4 @@ RN+Hermes 包**拿不回原始源码**（TS/JSX、注释、文件结构、局部
 
 ## 案例
 - 项目 C（2026-10-01）：Expo SDK 55 / HBC v96；hermes-dec 34 秒出伪 JS；静态即可证实鉴权方式与本地表结构；OTA 关闭，EAS 只剩"追溯线索"价值。
+- 项目 C S3（2026-10-02）：271 个 Metro 资源 4 秒还原到原始路径（fail 0），9 语言 i18n 导出；原服务端已下线、EAS/keystore 均不可得 → 必须新后端 + 新签名。
