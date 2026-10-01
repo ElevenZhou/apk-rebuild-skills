@@ -13,13 +13,13 @@ owner: ElevenZhou
 
 ## 需要的输入
 - 原包文件（APK/XAPK/AAB/EXE）、scope.md（单独使用时至少有一句权属确认）。
-- 工具：`unzip`、`sha256sum`；按引擎：apktool + jadx（原生 / 通用 manifest）、GDRE Tools（Godot）、AssetRipper/Il2CppDumper（Unity）。
+- 工具：`unzip`、`sha256sum`；按引擎：apktool + jadx（原生 / 通用 manifest）、GDRE Tools（Godot）、AssetRipper/Il2CppDumper（Unity）、hermes-dec（React Native + Hermes，见 `engines/react-native-hermes.md`）。
 
 ## S1 步骤
 1. **哈希基线**：`sha256sum <包>` → 写入 scope.md。XAPK 先解 zip，对内部每个 APK 也做哈希。
 2. **引擎识别**：`python scripts/detect_engine.py <包>` → 根据 so/特征文件给出引擎与加固判断（machine-verified）。
 3. **解包**：
-   - 所有包：`apktool d <apk> -o extracted/apktool`（manifest、权限、资源）+ `jadx -d extracted/jadx <apk>`（Java 层 SDK/桥接）。
+   - 所有包：`apktool d <apk> -o extracted/apktool`（RN 等业务不在 Java 层的大包可先 unzip，apktool 按需，见引擎专节）（manifest、权限、资源）+ `jadx -d extracted/jadx <apk>`（Java 层 SDK/桥接）。
    - 引擎专用：见 `rebuild-workflow/references/engines/<引擎>.md`。
 4. **资源清单**：`python scripts/asset_manifest.py extracted/ > assets/manifest.json`（按扩展名计数 + 体积）。
 

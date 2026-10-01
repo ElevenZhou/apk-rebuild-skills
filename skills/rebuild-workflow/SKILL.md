@@ -56,6 +56,7 @@ owner: ElevenZhou
 
 流程本身与引擎无关；引擎相关的工具链与坑在 `references/engines/`：
 - `godot.md` — ✅ 已在项目 D 全程验证
+- `react-native-hermes.md` — 🟡 项目 C 实战中（Expo + Hermes v96，S1/S2 工具链已验证）
 - `_template.md` — 其他引擎（Unity / Cocos / 原生）尚无真实案例，**遇到时照模板新建，项目结束回写**
 
 ## 活文档纪律
