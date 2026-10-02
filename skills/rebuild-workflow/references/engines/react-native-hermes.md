@@ -68,9 +68,16 @@ RN+Hermes 包**拿不回原始源码**（TS/JSX、注释、文件结构、局部
 4. Expo 包常带 Apple **SF Pro** 字体（name 表含 Apple 许可），Android 上不可再分发 → 重建必须替换。
 5. 第三方 SDK 资源（AppLovin、Firebase、ExoPlayer、`node_modules_*`）不导入，随依赖安装。
 
-## 开发（S5）
-- 推荐：最新 Expo 模板 + 同版本主要依赖（从 app.config plugins 和 bundle 内嵌 github 链接反推依赖清单）。（未验证）
-- 冒烟：`npx expo export` 能打出 bundle 即视为编译通过；`npx expo run:android --variant release` 真机冒烟。（未验证）
+## 开发（S5，部分已验证（项目C M0））
+- 推荐：最新 Expo 模板 + 同版本主要依赖（从 app.config plugins 和 bundle 内嵌 github 链接反推依赖清单）。项目C：`create-expo-app --template blank-typescript@sdk-55` 实测可用。
+- **先找原包自研 Expo 模块再选型**：伪 JS 中 grep `requireNativeViewManager('`／`requireOptionalNativeModule('`，jadx 中查 `expo/modules/<名>/`。R8 只混淆辅助类，模块类名、Prop 名、Event 名都保留，可以逐行功能等价重写为 `app/modules/<名>`（本地模块会被自动链接）。项目C：`ExpoPagView`（libpag PAGImageView）就是这样复原的。✅
+- 本地模块的 `build.gradle` 用 SDK55 写法：`plugins { id 'com.android.library'; id 'expo-module-gradle-plugin' }`。旧模板 `apply from: ExpoModulesCorePlugin.gradle` 会报"没有 compileSdk"。✅
+- 冒烟：`npx expo export --platform android` 能打出 bundle 即视为编译通过（产物 hbc 头可校验 Hermes 版本）。✅ 真机：`expo prebuild` → `gradlew assembleDebug -PreactNativeArchitectures=arm64-v8a` → `adb reverse tcp:8081` + Metro。✅
+- 坑：
+  1. JDK/SDK 放在**纯 ASCII 路径**（JAVA_HOME 含中文时，sdkmanager.bat 会报"未设置 JAVA_HOME"）；sdkmanager 解压 NDK 失败时，直接下载 `android-ndk-<r>-windows.zip` 解压到 `ndk/<Pkg.Revision>`。
+  2. RN 0.83 的 `@react-native/gradle-plugin` 钉死 foojay-resolver 0.5.0，配 Gradle 9 报 `JvmVendorSpec ... IBM_SEMERU` → 用 postinstall 补丁把它升到 1.0.0。
+  3. adb daemon 一重启，`adb reverse` 就会失效 → App 报"Unable to load script"。每次启动前重新执行 reverse。
+  4. 真机锁屏时 screencap 截出来是全黑 → 采证前先确认 `mWakefulness=Awake` 且 `isKeyguardShowing=false`。
 
 ## 打包（S7）
 - EAS Build 或本地 Gradle；原签名 keystore 若托管在 EAS（credentials），**负责人登录后可以下载**，决定能否原包名覆盖更新。（未验证）
@@ -78,3 +85,4 @@ RN+Hermes 包**拿不回原始源码**（TS/JSX、注释、文件结构、局部
 ## 案例
 - 项目 C（2026-10-01）：Expo SDK 55 / HBC v96；hermes-dec 34 秒出伪 JS；静态即可证实鉴权方式与本地表结构；OTA 关闭，EAS 只剩"追溯线索"价值。
 - 项目 C S3（2026-10-02）：271 个 Metro 资源 4 秒还原到原始路径（fail 0），9 语言 i18n 导出；原服务端已下线、EAS/keystore 均不可得 → 必须新后端 + 新签名。
+- 项目 C M0（2026-10-02）：Expo55 骨架 + 复原 expo-pag-view，arm64 debug 包在 Android 12 真机启动无崩溃（Fabric）。
