@@ -76,7 +76,7 @@ RN+Hermes 包**拿不回原始源码**（TS/JSX、注释、文件结构、局部
 - 坑：
   1. JDK/SDK 放在**纯 ASCII 路径**（JAVA_HOME 含中文时，sdkmanager.bat 会报"未设置 JAVA_HOME"）；sdkmanager 解压 NDK 失败时，直接下载 `android-ndk-<r>-windows.zip` 解压到 `ndk/<Pkg.Revision>`。
   2. RN 0.83 的 `@react-native/gradle-plugin` 钉死 foojay-resolver 0.5.0，配 Gradle 9 报 `JvmVendorSpec ... IBM_SEMERU` → 用 postinstall 补丁把它升到 1.0.0。
-  3. adb daemon 一重启，`adb reverse` 就会失效 → App 报"Unable to load script"。每次启动前重新执行 reverse。
+  3. adb daemon 一重启，`adb reverse` 就会失效 → App 报"Unable to load script"。每次启动前重新执行 reverse。如果 Agent 的 shell 每条命令结束都会回收 daemon，表现为白屏或图片 `ECONNREFUSED`，此时应在后台常驻 `adb nodaemon server`，再执行 reverse。核对 Metro 时用 `curl --noproxy '*' 127.0.0.1:8081/status`，否则走系统代理会得到 502 假阴性。
   4. 真机锁屏时 screencap 截出来是全黑 → 采证前先确认 `mWakefulness=Awake` 且 `isKeyguardShowing=false`。
 
 ## 打包（S7）
