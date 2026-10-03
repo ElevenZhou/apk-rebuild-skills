@@ -21,8 +21,12 @@
 | 云端关卡（Unity CCD） | CCD endpoint 无鉴权直读：`https://{projectId}.client-api.unity3dusercontent.com/client_api/v1/environments/{env}/buckets/{bucketId}/entry_by_path/content/?path=...`。**projectId 在 PlayerSettings.cloudProjectId；bucketId/env 在 datapack 或 addressables 里的 CloudContentConfiguration MonoBehaviour（raw bytes 扫 GUID+environment 名）；注意 307 重定向要 `curl -L`** | ✅ 项目 F：Live 481 关 + Wip 50 关全量拉下，MD5 抽检一致 |
 
 ## 开发（S5）
-- 冒烟命令：⬜ 未验证（候选：Unity 编辑器批处理模式 + 真机 ADB）
-- 测试运行方式：⬜
+- 工程骨架（文本形态可先建，Unity 打开即用）：`Packages/manifest.json`（URP + Zenject/Extenject + Addressables + Newtonsoft）、`ProjectSettings/ProjectVersion.txt`、`Assets/{Scripts,Art,Config,StreamingAssets}`、asmdef、`.gitignore`。Zenject 走 OpenUPM scoped registry（`com.svermeulen.extenject`）。
+- 关卡数据管线：CCD JSON → 归一化 JSON（Python，工具 `tools/convert_levels.py`）→ `StreamingAssets/levels/level_XXX.json` → 运行期 `JsonUtility.FromJson<LevelData>`。**注意 JsonUtility 对 `List<object>` 字段（如 depositBoxConnections）支持有限，必要时改 Newtonsoft**。
+- 契约文件优先于实现：把 docs/03/04 的埋点事件名、AB 键、存档键固化成 C# 常量类，禁止改名（运营/迁移依赖）。
+- 冒烟：Editor 菜单 `[MenuItem]` 一键自检（加载全部关卡 + 配置存在），比 headless CLI 更早可用。
+- 前置坑：**Unity 编辑器（含 Android 模块）是硬依赖**，不在则无法编译/冒烟；先探测 `Unity Hub/Editor` 与 `JAVA_HOME/ANDROID_HOME`。
+- 工程路径用纯 ASCII（中文路径会让 Unity/OpenCV 静默失败）。
 
 ## 打包（S7）
 - 工具链版本：⬜（项目 F 若沿用 Unity 6 → Unity 6000.0.x LTS + JDK)
