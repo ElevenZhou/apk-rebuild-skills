@@ -36,6 +36,20 @@ powershell -ExecutionPolicy Bypass -File D:/apk-rebuild-skills/install/install.p
 
 更新：`git pull` 即可（安装用的是目录联接，不需要重新安装）。
 
+### 从团队共享盘安装（Y:\Skills）
+
+共享副本：`Y:\Skills\apk-rebuild-skills`（NAS 不可用时用 `\\192.168.31.121\projects\Skills\apk-rebuild-skills`）。
+
+```powershell
+git -C Y:\Skills\apk-rebuild-skills pull
+powershell -ExecutionPolicy Bypass -File Y:\Skills\apk-rebuild-skills\install\install.ps1 -Targets workbuddy,claude,codex,trae
+```
+
+- 源在网络盘上无法建目录联接，脚本会**自动切换为复制模式**；`git pull` 后需要重跑一次脚本才会更新。
+- `codex` 目标读取 `$env:CODEX_HOME`（未设置时用 `~/.codex`）；装到任意目录用 `-Dest <目录>`。
+- OpenCode 会自动读取 `~/.claude/skills`，装了 `claude` 就不用单独装。
+- 给其他 AI 的一句话安装提示词见 [docs/install-prompt.md](docs/install-prompt.md)。
+
 ### 前置环境（按需）
 | 用途 | 需要 |
 |---|---|
