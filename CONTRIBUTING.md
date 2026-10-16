@@ -7,6 +7,13 @@
   - `fix/<主题>`：修正错误
   - `retro/<项目代号>`：项目复盘回写
   - `engine/<引擎>`：新增引擎手册
+  - `case/project-<代号>`：项目进行中的引擎专节、项目特例（可直接提交，阶段性合入）
+  - `release/v<版本>`：维护人汇总发版
+- **每个项目用独立 worktree**，不要在同一个工作区来回切分支（提交会落错分支，项目 C 踩过）：
+  ```bash
+  git worktree add ../apk-rebuild-skills-e -b case/project-e main
+  ```
+- 改动分级：引擎专节、项目特例 → 直接进 case 分支；通用流程、铁律、决策门、出口标准 → 先写进 `docs/cases/project-X.md` 的"待审批建议"，负责人确认后再改。
 
 ## 2. 提交信息
 ```
@@ -40,6 +47,7 @@
 ## 6. 更新通知
 - 发 Release 时在团队群发一条：版本号 + 3 行以内的变化 + 是否需要重启 Agent。
 - 同事日常 `git pull` 即可（安装是目录联接，拉取即生效，重启 Agent 后加载新版）。
+- 团队共享盘副本（`Y:\Skills\apk-rebuild-skills`）由维护人更新：NAS 上文件写入几分钟后即被锁定，**禁止在 Y 盘就地 git pull/merge/checkout**；用"clone 到 `.new` → 旧目录改名 `.bak-<日期>` → `.new` 改名替换"。从 Y 盘安装的同事更新后重跑 install.ps1。
 - 建议在 GitHub 仓库点 Watch → Releases only，自动收到邮件。
 
 ## 7. 复盘回写（强制）

@@ -13,7 +13,7 @@
 | `rebuild-workflow` | 总控 S0–S7 | 阶段、输入检查表、决策门、出口标准、复盘回写 | 入口 |
 | `rebuild-recon` | S1–S2 | 解包、引擎识别、docs/01-09 九篇文档 | ✅ 只做分析 |
 | `rebuild-asset-recovery` | S3 | 资源回导（Godot 全套脚本 + RN 资源/i18n 脚本） | ✅ 只提资源 |
-| `rebuild-product-design` | S4 | 产品文档、决策门 D1-D7、品牌、微创新、开发计划 | ✅ 规划新版本 |
+| `rebuild-product-design` | S4 | 产品文档、决策门 D1-D9、品牌、微创新、开发计划 | ✅ 规划新版本 |
 | `rebuild-dev-milestones` | S5 | M0-M5 里程碑开发与纪律 | ✅ 任何重写项目 |
 | `rebuild-device-evidence` | S6 | ADB 真机自动化 + 录屏抽帧 + 视觉模型读图 | ✅ 任何真机测试 |
 | `rebuild-build-release` | S7 | 打签名 APK、真机冒烟、交付清单 | ✅ 任何 Godot 打包 |
@@ -48,11 +48,11 @@ powershell -ExecutionPolicy Bypass -File D:/apk-rebuild-skills/install/install.p
 共享副本：`Y:\Skills\apk-rebuild-skills`（NAS 不可用时用 `\\192.168.31.121\projects\Skills\apk-rebuild-skills`）。
 
 ```powershell
-git -C Y:\Skills\apk-rebuild-skills pull
 powershell -ExecutionPolicy Bypass -File Y:\Skills\apk-rebuild-skills\install\install.ps1 -Targets workbuddy,claude,codex,trae
 ```
 
-- 源在网络盘上无法建目录联接，脚本会**自动切换为复制模式**；`git pull` 后需要重跑一次脚本才会更新。
+- 源在网络盘上无法建目录联接，脚本会**自动切换为复制模式**；共享副本更新后重跑一次脚本即可。
+- **不要在 Y 盘副本里 `git pull` / 改文件**：NAS 会在文件写入几分钟后锁定（不可改、删、改名），就地 git 操作会报 `unable to unlink`。维护人更新方式：在本地仓库发布后，`git clone` 到 `Y:\Skills\apk-rebuild-skills.new` → 旧目录改名 `apk-rebuild-skills.bak-<日期>` → `.new` 改名为正式目录（目录可新建和改名）。
 - `codex` 目标读取 `$env:CODEX_HOME`（未设置时用 `~/.codex`）；装到任意目录用 `-Dest <目录>`。
 - OpenCode 会自动读取 `~/.claude/skills`，装了 `claude` 就不用单独装。
 - 给其他 AI 的一句话安装提示词见 [docs/install-prompt.md](docs/install-prompt.md)。
@@ -98,7 +98,7 @@ tools/lint_skills.py             格式检查 + 密钥扫描（提交前跑）
 ```
 
 ## 参与维护
-见 [CONTRIBUTING.md](CONTRIBUTING.md)。核心一条：**每个项目结束都要提一个复盘 PR**，这是这套 skill 持续进化的唯一来源。
+见 [CONTRIBUTING.md](CONTRIBUTING.md)。核心两条：**每个项目结束都要提一个复盘 PR**，这是这套 skill 持续进化的唯一来源；**每个项目用独立 `git worktree` + `case/project-x` 分支**，不要在同一工作区来回切分支。
 
 ## 版本
 见 [CHANGELOG.md](CHANGELOG.md)。

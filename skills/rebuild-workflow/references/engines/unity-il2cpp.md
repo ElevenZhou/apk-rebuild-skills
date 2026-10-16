@@ -20,6 +20,11 @@
 | Addressables bundle | assets/aa/Android/*.bundle（项目 F：3 场景 + defaultlocalgroup + CJK 字体 + monoscripts + unitybuiltin，77.6MB） | 待 S3 样品验证 | ⬜ |
 | 云端关卡（Unity CCD） | CCD endpoint 无鉴权直读：`https://{projectId}.client-api.unity3dusercontent.com/client_api/v1/environments/{env}/buckets/{bucketId}/entry_by_path/content/?path=...`。**projectId 在 PlayerSettings.cloudProjectId；bucketId/env 在 datapack 或 addressables 里的 CloudContentConfiguration MonoBehaviour（raw bytes 扫 GUID+environment 名）；注意 307 重定向要 `curl -L`** | ✅ 项目 F：Live 481 关 + Wip 50 关全量拉下，MD5 抽检一致 |
 
+### S3 按类分评（项目 F 复盘 F-7/F-8）
+- **Texture2D / Font / TextAsset**：可导出为 png/ttf/txt，按常规样品验收。
+- **AudioClip** 两种存储：① Vorbis 内联在 bundle/resS（UnityPy 可直接导 ogg）；② FMOD **FSB5** 外置——FSB5 是**压缩容器不是加密**，用 fsb5/vgmstream 解。时长校验用 `clip.samples / clip.frequency`，不要信 `length`。
+- **Mesh / Sprite / AnimationClip**：无通用可编辑源格式 → 存 raw（`get_raw_data()`）+ 说明，报告记 `PARTIAL`，按类单独出结论，不卡整体出口。
+
 ## 开发（S5）
 - 工程骨架（文本形态可先建，Unity 打开即用）：`Packages/manifest.json`（URP + Zenject/Extenject + Addressables + Newtonsoft）、`ProjectSettings/ProjectVersion.txt`、`Assets/{Scripts,Art,Config,StreamingAssets}`、asmdef、`.gitignore`。Zenject 走 OpenUPM scoped registry（`com.svermeulen.extenject`）。
 - 关卡数据管线：CCD JSON → 归一化 JSON（Python，工具 `tools/convert_levels.py`）→ `StreamingAssets/levels/level_XXX.json` → 运行期 `JsonUtility.FromJson<LevelData>`。**注意 JsonUtility 对 `List<object>` 字段（如 depositBoxConnections）支持有限，必要时改 Newtonsoft**。

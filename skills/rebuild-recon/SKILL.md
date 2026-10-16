@@ -1,7 +1,7 @@
 ---
 name: rebuild-recon
-description: 逆向重建 S1 侦察解包 + S2 静态分析。对自有 APK/XAPK/EXE 做哈希基线、引擎/加固识别、解包，并产出 docs/01-09 九篇基线文档（带置信度标注）。单独使用场景：只想摸清一个自家安装包的结构、SDK、接口、存储和资源，不一定要重建。触发词：解包、APK 分析、引擎识别、逆向文档、九篇文档。
-version: 1.0.1
+description: 逆向重建 S1 侦察解包 + S2 静态分析。对自有 APK/XAPK/EXE 做哈希基线、引擎/加固识别、解包、源码可恢复性结论，并产出 docs/01-09 九篇基线文档（带置信度标注）。单独使用场景：只想摸清一个自家安装包的结构、SDK、接口、存储和资源，不一定要重建。触发词：解包、APK 分析、引擎识别、逆向文档、九篇文档。
+version: 1.1.0
 owner: ElevenZhou
 ---
 
@@ -14,16 +14,19 @@ owner: ElevenZhou
 ## 需要的输入
 - 原包文件（APK/XAPK/AAB/EXE）、scope.md（单独使用时至少有一句权属确认）。
 - 工具：`unzip`、`sha256sum`；按引擎：apktool + jadx（原生 / 通用 manifest）、GDRE Tools（Godot）、AssetRipper/Il2CppDumper（Unity）、hermes-dec（React Native + Hermes，见 `engines/react-native-hermes.md`）。
+- 环境前置（见 `rebuild-workflow/references/input-checklist.md`）：ASCII 工作路径、JAVA_HOME 不含中文、java 可显式调用。
 
 ## S1 步骤
-1. **哈希基线**：`sha256sum <包>` → 写入 scope.md。XAPK 先解 zip，对内部每个 APK 也做哈希。
+1. **哈希基线**：统一用 `sha256sum <包>`（不依赖 PowerShell 回显）→ 写入 scope.md。XAPK 先解 zip，对内部每个 APK 也做哈希。
 2. **引擎识别**：`python scripts/detect_engine.py <包>` → 根据 so/特征文件给出引擎与加固判断（machine-verified）；RN 包额外输出 `react_native.js_bundle`（如 `hermes:v96`）和 Expo 信息，XAPK 列出 `split_apks`。
 3. **解包**：
-   - 所有包：`apktool d <apk> -o extracted/apktool`（RN 等业务不在 Java 层的大包可先 unzip，apktool 按需，见引擎专节）（manifest、权限、资源）+ `jadx -d extracted/jadx <apk>`（Java 层 SDK/桥接）。
+   - **XAPK/APKS：列出并解开全部分包**（base + 所有 `config.*.apk` + OBB + assetpack），不能只解 base.apk（项目 C：hdpi 资源只在 `config.hdpi.apk`）。
+   - 所有包：`apktool d <apk> -o extracted/apktool`（RN 等业务不在 Java 层的大包先 unzip，apktool 按需，见引擎专节）（manifest、权限、资源）+ `jadx -d extracted/jadx <apk>`（Java 层 SDK/桥接）。
    - 引擎专用：见 `rebuild-workflow/references/engines/<引擎>.md`。
-4. **资源清单**：`python scripts/asset_manifest.py extracted/ > assets/manifest.json`（按扩展名计数 + 体积）。
+4. **资源清单**：`python scripts/asset_manifest.py extracted/ > assets/manifest.json`（按扩展名计数 + 体积，含全部分包）。
+5. **源码可恢复性结论**（写入 scope.md 与 docs/09）：逐项判断 ① 逻辑层可读程度（明文/字节码可反编译/加密/native）② 资源可导出程度 ③ 是否有加固 ④ 服务端依赖。结论给出 R1 近似源码恢复 / R2 契约+重写 / R3 仅资源复用 之一，交 `rebuild-workflow` S1 决策门。
 
-S1 出口：引擎类型（附日志证据）、加固结论、资源总量清单。
+S1 出口：引擎类型（附日志证据）、加固结论、资源总量清单（含全部分包）、源码可恢复性结论。
 
 ## S2 九篇文档（固定编号与命名）
 
@@ -46,17 +49,21 @@ S1 出口：引擎类型（附日志证据）、加固结论、资源总量清�
 - 拿不准的数值写 `P0 占位`，进 09 篇，**禁止编造**。
 - 涉及商业判断（是否在架、竞品）必须联网核实并附链接和日期。
 - 密钥/token 类发现只记录"存在 + 位置"，**不把值写进文档**。
+- 项目已有更严格的文档门禁时，以严者为准。
 
 S2 出口：九篇齐全；09 篇里每个 P0 都标了计划在哪个里程碑关闭；负责人看过 01 与 09。
 
 ## 常见坑
-- XAPK = zip 套多个 APK + OBB/assetpack，资源常在 assetpack 里，不要只解 base.apk。
+- XAPK = zip 套多个 APK + OBB/assetpack，资源常在 config 分包或 assetpack 里，不要只解 base.apk。
 - 加固包（360/梆梆/腾讯乐固等）jadx 只看到壳 → 文档改靠真机动态观察，预期降级写进 09。
 - Godot 加密脚本（.gdc 加密）无法还原逻辑 → 只取契约（接口名、配置、埋点），玩法按规则重写。
+- `apktool.bat` 找不到 java 时会**静默卡死**不报错 → 显式调用 `"<jdk>/bin/java" -jar apktool.jar d <apk> -s -f`（`-s` 跳过 dex，交给 jadx）。
+- RN 大包 apktool 可能跑 30 分钟以上 → 先 `unzip` 拿 bundle 与资源，apktool 只为 manifest 按需跑。
 
 ## 相关 skill
 上游 `rebuild-workflow`（S0）→ 下游 `rebuild-asset-recovery`（S3）、`rebuild-product-design`（S4 使用九篇文档）。
 
 ## 变更记录
+- 1.1.0（2026-10-16）哈希统一 sha256sum；强制解全部分包；新增步骤 5 源码可恢复性结论并写入 S1 出口；补 apktool 无 java 卡死、RN 大包慢两条坑（项目 C/F 复盘 C-4/C-9/F-2/F-4）。
 - 1.0.1（2026-10-02）detect_engine.py 识别 Hermes 字节码版本、Expo 配置与 XAPK 分包（项目 C）。
 - 1.0.0（2026-10-01）项目 D 提炼。

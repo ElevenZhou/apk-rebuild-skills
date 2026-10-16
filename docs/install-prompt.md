@@ -18,7 +18,7 @@
 源目录：Y:\Skills\apk-rebuild-skills
 目标目录：<目标目录>
 
-1. 执行 git -C Y:\Skills\apk-rebuild-skills pull 拿到最新版。
+1. 不要在 Y 盘目录里执行 git pull 或修改任何文件（NAS 会锁定已写入的文件）；Y 盘副本由维护人保持最新。可用 git -C Y:\Skills\apk-rebuild-skills describe --tags 查看当前版本。
 2. 运行：powershell -ExecutionPolicy Bypass -File Y:\Skills\apk-rebuild-skills\install\install.ps1 -Dest "<目标目录>"
    （脚本会把 skills\ 下 7 个 rebuild-* 目录整体复制过去；同名旧目录自动改名备份，不删除。）
    如果不能运行 PowerShell，就手工把 Y:\Skills\apk-rebuild-skills\skills\ 下 7 个目录整个复制到目标目录，保持 SKILL.md、references\、scripts\ 结构不变；已有同名目录先改名为 <名字>.bak-日期。
@@ -40,8 +40,7 @@
 ## 更新
 
 ```text
-git -C Y:\Skills\apk-rebuild-skills pull
 powershell -ExecutionPolicy Bypass -File Y:\Skills\apk-rebuild-skills\install\install.ps1 -Dest "<目标目录>"
 ```
 
-本机若是 `git clone` 到本地盘再安装（目录联接模式），之后只需 `git pull`，无需重跑脚本。
+维护人发布新版后会替换 Y 盘副本，同事重跑上面一条即可（不要在 Y 盘里 `git pull`）。本机若是 `git clone` 到本地盘再安装（目录联接模式），之后只需 `git pull`，无需重跑脚本。
