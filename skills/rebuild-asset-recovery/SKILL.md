@@ -1,7 +1,7 @@
 ---
 name: rebuild-asset-recovery
 description: 逆向重建 S3 资源回导：从自有安装包解包产物中恢复可编辑的美术/音频/字体/动画/文案资源，遵循"样品先行 → 批量 → 报告 → 原件不动"规则。内置 Godot 4.x 全套无 GDRE 依赖回导脚本（ctex→png、oggvorbisstr→ogg、fontdata→ttf、spatlas/spskel→Spine）；其他引擎给出通用流程与候选工具。由原 godot-asset-recovery 迁入。触发词：资源回导、提取素材、ctex、oggvorbisstr、spine 导出、恢复美术资源。
-version: 1.0.0
+version: 1.1.0
 owner: ElevenZhou
 ---
 
@@ -54,6 +54,19 @@ python scripts/godot/spine_batch.py <imported_dir> <out_dir>/spine <report.txt>
 - `.scn` 二进制场景 → GDRE Tools 是首选（`--recover=… --output=…`），D 项目 v2.6.4 CLI 卡死未用。
 - 有 Spine 资源 = 原包用了 spine-godot 定制版，重建需集成运行时或先降级为静态贴图。
 
+## React Native / Expo + Hermes（✅ 已验证，项目 C）
+前置：`rebuild-recon` 已用 hermes-dec 产出伪 JS（`hbc-decompiler index.android.bundle decompiled.js`）。资源是明文，难点是**还原原始路径和文件名**。
+
+```bash
+# 若为 XAPK/APKS，先把 config.<密度>.apk 解压，作为第二个 --res 传入
+python scripts/rn/rn_asset_restore.py decompiled.js <out>/assets_imported --res <jadx>/resources/res [--res <split>/res] [--only png,svg --limit 5]
+python scripts/rn/i18n_extract.py decompiled.js <out>/assets_imported/i18n en:<起行>-<止行> ja:... 
+```
+- 依据：Metro `registerAsset` 字面量（`httpServerLocation/name/type/width/height/scales/fileHashes`）。按 `fileHashes` md5 精确匹配 → `OK`；匹配不到时按 Android 资源名 + 密度兜底 → `OK_RECOMP`（aapt2 重压缩的 PNG，尺寸已核对）；分包缺密度 → `PARTIAL`。
+- i18n：先 `grep -n "'loginWithGoogle'"` 之类的通用键定位各 locale 模块，模块起止 = 前一个 `= function(a0, a1, a2, a3, a4, a5, a6)` 到下一个 `__d;`；语言顺序按 i18n 初始化处 `r11['en'] = …` 推断，**导出后必须抽同一键做 9 语核对**。
+- 孤儿资源：`res` 里 `assets_*`/`src_*` 前缀但未被注册表覆盖的文件单独拷到 `_orphans_unreferenced/`，路径标 inferred。
+- 坑与项目数据见 `rebuild-workflow/references/engines/react-native-hermes.md`「资源回导」。
+
 ## 其他引擎（⚠️ 待真实案例）
 按通用规则执行，工具候选见 `rebuild-workflow/references/engines/_template.md`。首个真实项目做完后在此补一节并 PR。
 
@@ -65,4 +78,5 @@ python scripts/godot/spine_batch.py <imported_dir> <out_dir>/spine <report.txt>
 上游 `rebuild-recon` → 下游 `rebuild-dev-milestones`（M0 骨架引用 assets_imported）、`rebuild-product-design`（换皮时决定哪些资源替换）。
 
 ## 变更记录
+- 1.1.0（2026-10-02）新增 React Native/Expo + Hermes 小节与 scripts/rn（项目 C 实测）。
 - 1.0.0（2026-10-01）由 godot-asset-recovery 迁入并改名；脚本参数化；增加通用规则。
