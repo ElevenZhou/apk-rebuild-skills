@@ -12,13 +12,20 @@
 |---|---|---|---|
 | `rebuild-workflow` | 总控 S0–S7 | 阶段、输入检查表、决策门、出口标准、复盘回写 | 入口 |
 | `rebuild-recon` | S1–S2 | 解包、引擎识别、docs/01-09 九篇文档 | ✅ 只做分析 |
-| `rebuild-asset-recovery` | S3 | 资源回导（Godot 全套脚本） | ✅ 只提资源 |
+| `rebuild-asset-recovery` | S3 | 资源回导（Godot 全套脚本 + RN 资源/i18n 脚本） | ✅ 只提资源 |
 | `rebuild-product-design` | S4 | 产品文档、决策门 D1-D7、品牌、微创新、开发计划 | ✅ 规划新版本 |
 | `rebuild-dev-milestones` | S5 | M0-M5 里程碑开发与纪律 | ✅ 任何重写项目 |
 | `rebuild-device-evidence` | S6 | ADB 真机自动化 + 录屏抽帧 + 视觉模型读图 | ✅ 任何真机测试 |
 | `rebuild-build-release` | S7 | 打签名 APK、真机冒烟、交付清单 | ✅ 任何 Godot 打包 |
 
-引擎支持：**Godot 4.x 已全流程验证**；Unity / Cocos / 原生只有模板（`skills/rebuild-workflow/references/engines/_template.md`），等第一个真实项目做完再补全。
+引擎支持（详见 `skills/rebuild-workflow/references/engines/`）：
+
+| 引擎 | 状态 | 案例 |
+|---|---|---|
+| Godot 4.x | ✅ 全流程验证（S0–S7，含签名 APK） | 项目 D |
+| React Native（Expo）+ Hermes | 🟡 S1–S3 + M0 验证（含自研原生模块复原） | 项目 C |
+| Unity + IL2CPP | 🟡 S1–S3 + M0 部分验证（Il2CppDumper / UnityPy / CCD 关卡拉取） | 项目 F（E 复用） |
+| Cocos / 原生等 | 只有模板 `_template.md`，有真实案例再补 | — |
 
 ## 安装（3 步）
 

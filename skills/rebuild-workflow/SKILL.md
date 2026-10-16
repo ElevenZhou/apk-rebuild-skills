@@ -1,7 +1,7 @@
 ---
 name: rebuild-workflow
 description: 自有 APK/游戏"源码丢失 → 逆向重建 → 再开发 → 交付工程+试玩包"全流程总控。接手任何"只有安装包没有源码、要重建成可迭代新工程"的项目时首先加载本 skill；它负责阶段划分、输入完整性检查、决策门、出口标准，并把具体阶段分派给其他 rebuild-* skill。触发词：逆向重建、源码丢失、离职未交接、APK 重建、重做一个同款、换皮重建。
-version: 1.0.0
+version: 1.1.0
 owner: ElevenZhou
 ---
 
@@ -56,8 +56,9 @@ owner: ElevenZhou
 
 流程本身与引擎无关；引擎相关的工具链与坑在 `references/engines/`：
 - `godot.md` — ✅ 已在项目 D 全程验证
-- `react-native-hermes.md` — 🟡 项目 C 实战中（Expo + Hermes v96，S1-S3 已验证）
-- `_template.md` — 其他引擎（Unity / Cocos / 原生）尚无真实案例，**遇到时照模板新建，项目结束回写**
+- `react-native-hermes.md` — 🟡 项目 C 实战中（Expo + Hermes v96，S1-S3 + M0 已验证）
+- `unity-il2cpp.md` — 🟡 项目 F 实战中（Unity 6 / metadata 31，S1-S3 + M0 部分验证；项目 E 复用）
+- `_template.md` — 其他引擎（Cocos / 原生等）尚无真实案例，**遇到时照模板新建，项目结束回写**
 
 ## 活文档纪律
 
@@ -77,5 +78,5 @@ owner: ElevenZhou
 `rebuild-recon` · `rebuild-asset-recovery` · `rebuild-product-design` · `rebuild-dev-milestones` · `rebuild-device-evidence` · `rebuild-build-release`
 
 ## 变更记录
-
+- 1.1.0（2026-10-16）引擎适配新增 react-native-hermes（项目 C）、unity-il2cpp（项目 F）。
 - 1.0.0（2026-10-01）从项目 D（Meowdoku → PawStar，Godot 4.6）全程提炼。
