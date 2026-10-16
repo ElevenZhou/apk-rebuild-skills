@@ -2,7 +2,7 @@
 
 公司内部用的 **AI Agent Skill 包**：把"自有产品源码丢失 → 逆向重建 → 再开发 → 交付工程 + 试玩 APK"整套流程固化下来。目标是让任何同事接手这类项目时都按同一套流程、同一套出口标准走，不依赖个人经验。
 
-适用于 WorkBuddy / CodeBuddy / Claude Code / Codex 等支持 `SKILL.md` 的 Agent 工具。
+适用于 WorkBuddy / CodeBuddy / Claude Code / Codex / Trae CN / OpenCode 等支持 `SKILL.md` 的 Agent 工具。当前版本见 [CHANGELOG.md](CHANGELOG.md)（v1.2.1）。
 
 > ⚠️ 只用于**公司自有、权属明确**的产品。第三方产品一律不做。
 
@@ -35,13 +35,20 @@ git clone https://github.com/ElevenZhou/apk-rebuild-skills.git D:/apk-rebuild-sk
 
 # 2. 安装：把 skills/* 链接到本机 Agent 的 skills 目录（目录联接，之后 git pull 就是更新）
 powershell -ExecutionPolicy Bypass -File D:/apk-rebuild-skills/install/install.ps1
-#   可选参数：-Targets workbuddy,claude,codex   默认 workbuddy
+#   可选参数：-Targets workbuddy,claude,codex,trae   默认 workbuddy（一次装多个用逗号分隔）
 #   macOS/Linux：bash install/install.sh
 
-# 3. 重启 Agent 工具，在技能列表里确认出现 rebuild-*
+# 3. 重启 Agent 工具（或新开会话），在技能列表里确认出现 rebuild-*
 ```
 
-更新：`git pull` 即可（安装用的是目录联接，不需要重新安装）。
+更新：`git pull` 即可（安装用的是目录联接，所有已装的 Agent 一起更新，不需要重新安装）。
+
+| 目标 | 安装位置 | 备注 |
+|---|---|---|
+| `workbuddy` | `~/.workbuddy/skills` | WorkBuddy / CodeBuddy |
+| `claude` | `~/.claude/skills` | Claude Code；OpenCode 也读这里 |
+| `codex` | `$env:CODEX_HOME/skills`（未设置时 `~/.codex/skills`） | Codex |
+| `trae` | `~/.trae-cn/skills` | Trae CN |
 
 ### 从团队共享盘安装（Y:\Skills）
 
@@ -68,21 +75,38 @@ powershell -ExecutionPolicy Bypass -File Y:\Skills\apk-rebuild-skills\install\in
 
 **所有工具链放纯英文路径**（如 `C:/android-sdk`），中文路径会导致多个工具静默失败。
 
-## 使用示例
+## 使用说明
 
-**开一个新项目（完整流程）**
-> 用 rebuild-workflow 开一个新的重建项目，原包在 D:/work/项目E/xxx.xapk，负责人是张三。
+### 怎么调用
+两种方式都可以：**直接描述需求**（Agent 按技能描述自动选），或**点名技能**"用 rebuild-xxx …"（最稳）。不确定用哪个就说"用 rebuild-workflow"，它会判断当前阶段再分派。
 
-Agent 会先跑输入检查表、生成 scope.md，等你确认后再进入解包。
+| 工具 | 调用方式 |
+|---|---|
+| WorkBuddy / CodeBuddy | 直接说需求，或"用 rebuild-workflow …" |
+| Claude Code | 直接说需求；或输入 `/rebuild-workflow` 后接需求 |
+| Codex | 直接说需求，或开头写"使用 rebuild-recon 技能"；`/skills` 可查看是否识别 |
+| Trae CN | 对话里说"用 rebuild-xxx 技能 …"；未识别时到设置里确认技能已启用 |
+| OpenCode | 读 `~/.claude/skills`，用法同 Claude Code |
 
-**只分析一个包**
-> 用 rebuild-recon 分析 D:/apk/foo.apk，先识别引擎，再写 docs/01 和 05。
+装完或更新后要**重启工具或新开会话**才会加载。自检：问"分析一下这个 apk 是什么引擎，你会用哪个技能？"，答 rebuild-recon 即生效。
 
-**只打包**
-> 用 rebuild-build-release 把 D:/proj/game 打成签名 APK 装到手机上。
+### 常用说法（改路径即可）
 
-**真机验证**
-> 用 rebuild-device-evidence 启动 com.foo.game，截首页，找到"开始"按钮点进去，告诉我关卡号。
+| 想做的事 | 对 Agent 说 |
+|---|---|
+| 新项目完整流程 | 用 rebuild-workflow 开一个重建项目，原包在 `D:/work/项目E/xxx.xapk`，负责人是张三 |
+| 只分析安装包 | 用 rebuild-recon 分析 `D:/apk/foo.apk`，识别引擎，给出源码可恢复性结论 |
+| 导出素材 | 用 rebuild-asset-recovery 把 `extracted/` 里的图片、音频、字体导出，先做样品验收 |
+| 写方案和计划 | 用 rebuild-product-design 基于 docs/01-09 写产品文档，逐个过决策门 D1-D9 |
+| 里程碑开发 | 用 rebuild-dev-milestones 开始 M1，先过一遍待优化清单 |
+| 真机测试 | 用 rebuild-device-evidence 启动 com.foo.game，截首页，点"开始"，告诉我关卡号 |
+| 打包交付 | 用 rebuild-build-release 把 `D:/proj/game` 打成签名 APK 装到手机，并出交付清单 |
+
+### Agent 会在哪里停下来等你
+- **S0**：输入检查表和 scope.md——授权范围逐项勾选，**没勾的事 Agent 不做**。
+- **S1 结束**：源码可恢复性结论（决定走 R1/R2/R3）。
+- **S4**：决策门 D1-D9 逐门确认，Agent 不代替负责人拍板。
+- **每个里程碑收尾**：请负责人确认出口标准。
 
 ## 仓库结构
 
