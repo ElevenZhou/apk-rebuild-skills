@@ -13,6 +13,8 @@ param(
     [string]$Dest
 )
 $ErrorActionPreference = "Stop"
+# `powershell -File x.ps1 -Targets a,b,c` passes "a,b,c" as ONE string -> split it ourselves.
+$Targets = @($Targets | ForEach-Object { $_ -split '[,\s]+' } | Where-Object { $_ })
 $repo = Split-Path -Parent $PSScriptRoot
 $src = Join-Path $repo "skills"
 
