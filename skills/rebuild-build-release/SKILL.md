@@ -1,7 +1,7 @@
 ---
 name: rebuild-build-release
 description: 逆向重建 S7 打包交付：配置 Android 导出工具链（导出模板、JDK、Android build-tools、keystore）、生成签名试玩 APK、真机安装冒烟、整理交付工程文件与交付清单。内含 Godot 4.x 导出五坑（含"导出失败但零错误文案"的 ETC2 问题）。单独使用场景：任何 Godot 项目打 Android 包；任何项目的最终交付归档。触发词：打包 APK、导出安卓、签名、keystore、试玩包、交付工程、release。
-version: 1.0.0
+version: 1.1.0
 owner: ElevenZhou
 ---
 
@@ -60,13 +60,14 @@ release/<app>-v<版本>/
   docs/                          产品文档、开发计划、M#-进展、待优化清单快照
   交付清单.md                    含已知问题与下一步建议
 ```
-keystore 和密码**单独**交给负责人，不放进交付包。
+keystore 和密码**单独**交给负责人，不放进交付包，并且**双人双地备份**：keystore 与口令由两人分别保管、存两个物理位置（如 NAS + 离线介质），写交接记录（谁、何时、存哪、如何取回）。
 
 ## 出口标准
-签名 APK 真机安装、启动、完成一局全部通过；交付清单全绿；已知问题全部列出。
+签名 APK 真机安装、启动、完成一局全部通过；交付清单全绿；已知问题全部列出；**release keystore 已双人双地备份并有交接记录**。
 
 ## 相关 skill
 上游 `rebuild-dev-milestones` → 调用 `rebuild-device-evidence` → 交付后回 `rebuild-workflow` 执行复盘。
 
 ## 变更记录
+- 1.1.0（2026-10-16）出口与交付清单加入 keystore 双人双地备份 + 交接记录（项目 C 复盘 C-13）。
 - 1.0.0（2026-10-01）项目 D PawStar 首个签名 APK（122MB）打通过程提炼。

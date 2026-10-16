@@ -1,7 +1,7 @@
 ---
 name: rebuild-asset-recovery
 description: 逆向重建 S3 资源回导：从自有安装包解包产物中恢复可编辑的美术/音频/字体/动画/文案资源，遵循"样品先行 → 批量 → 报告 → 原件不动"规则。内置 Godot 4.x 全套无 GDRE 依赖回导脚本（ctex→png、oggvorbisstr→ogg、fontdata→ttf、spatlas/spskel→Spine）；其他引擎给出通用流程与候选工具。由原 godot-asset-recovery 迁入。触发词：资源回导、提取素材、ctex、oggvorbisstr、spine 导出、恢复美术资源。
-version: 1.1.0
+version: 1.2.0
 owner: ElevenZhou
 ---
 
@@ -18,10 +18,16 @@ owner: ElevenZhou
 ## 通用规则（与引擎无关）
 1. **样品先行**：每类资源先挑 3-5 个样品回导，人工验收（能打开、尺寸/时长正确），填 `references/sample-acceptance.md` 表，全部 PASS 再批量。
 2. **原件不动**：解包目录只读；输出到 `rebuild/<工程>/assets_imported/<类型>/`。
-3. **批量必出报告**：每行 `OK|FAIL <类型> <源> -> <目标> <规格>`，末行 `SUMMARY`。fail>0 的逐条进待优化清单。
+3. **批量必出报告**：每行 `<状态> <类型> <源> -> <目标> <规格>`，末行 `SUMMARY`。状态四级统一：
+   - `OK` 字节级/哈希一致；`OK_RECOMP` 内容一致但被重压缩（尺寸/时长已核对）；
+   - `PARTIAL` 只拿到部分（缺密度、缺依赖、只有 raw）——**不计 PASS**；`FAIL` 失败。
+   PARTIAL/FAIL 逐条进待优化清单。
 4. **命名还原**：去掉引擎加的 hash 后缀（`name.png-<md5>.ctex` → `name.png`），重名追加短 hash。
-5. **回读校验**：能用引擎再加载回来的，做往返对比（音频时长误差 <0.05s）。
+5. **回读校验**：能用引擎再加载回来的，做往返对比（音频时长误差 <0.05s；Unity AudioClip 用 `clip.samples / frequency`，不用 `length`）。
 6. 全部路径用纯 ASCII 更稳（OpenCV 等库遇中文路径会静默失败）。
+7. **按类分评**：样品验收按资源类别分别给结论；无通用可编辑格式的类别（如 Unity Mesh/Sprite/AnimationClip）允许"存 raw + 说明"，记 PARTIAL，不卡整体出口。
+8. **文案也是资源**：i18n/文案表与图片音频同等对待，进样品表并做多语言抽检。
+9. **版权/再分发审查**：字体读 name 表（版权、许可证字段）、图片读元数据（EXIF/XMP 作者、图库水印），第三方素材与原包权属不一致的标"可疑"进待优化清单，由负责人决定替换或保留。
 
 ## Godot 4.x（✅ 已验证）
 
@@ -68,15 +74,17 @@ python scripts/rn/i18n_extract.py decompiled.js <out>/assets_imported/i18n en:<�
 - 坑与项目数据见 `rebuild-workflow/references/engines/react-native-hermes.md`「资源回导」。
 
 ## 其他引擎（⚠️ 待真实案例）
-按通用规则执行，工具候选见 `rebuild-workflow/references/engines/_template.md`。首个真实项目做完后在此补一节并 PR。
+按通用规则执行，工具候选见 `rebuild-workflow/references/engines/_template.md`。首个真实项目做完后在此补一节并 PR。Unity IL2CPP 的按类分评与 AudioClip/FSB5 见 `engines/unity-il2cpp.md`「S3 按类分评」。
 
 ## 出口标准（= M0 资源部分）
-- 样品验收表 100% PASS；
-- 各类批量报告 SUMMARY fail=0，或失败项已登记且有降级方案。
+- 样品验收表按类别全部有结论：PASS，或"raw 保存 + 说明"已经负责人认可；
+- 各类批量报告 SUMMARY 中 FAIL=0、PARTIAL 已登记，或失败项已登记且有降级方案；
+- 版权/再分发审查完成，可疑项已进待优化清单并有处理决定。
 
 ## 相关 skill
 上游 `rebuild-recon` → 下游 `rebuild-dev-milestones`（M0 骨架引用 assets_imported）、`rebuild-product-design`（换皮时决定哪些资源替换）。
 
 ## 变更记录
+- 1.2.0（2026-10-16）报告状态统一 OK/OK_RECOMP/PARTIAL/FAIL（PARTIAL 不计 PASS）；新增按类分评、i18n 入样品表、版权/再分发审查并写入出口；Unity AudioClip 用 clip.samples、FSB5 非加密（项目 C/F 复盘 C-6/C-7/C-8/F-7/F-8）。
 - 1.1.0（2026-10-02）新增 React Native/Expo + Hermes 小节与 scripts/rn（项目 C 实测）。
 - 1.0.0（2026-10-01）由 godot-asset-recovery 迁入并改名；脚本参数化；增加通用规则。

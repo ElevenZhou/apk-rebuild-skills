@@ -18,7 +18,7 @@
 6. 环境坑：JAVA_HOME 含中文导致 sdkmanager 失败；RN 0.83 gradle-plugin 钉死 foojay 0.5.0 与 Gradle 9 冲突；adb 常驻和 Metro 代理会造成假阴性。详见 `engines/react-native-hermes.md`。
 7. 多项目共用一个仓库工作区来回切分支，提交会落错分支 → **每个项目开独立 `git worktree`**。
 
-## 待负责人审批的通用建议（未纳入 v1.1.0）
+## 通用建议（✅ 已经负责人批准，全部纳入 v1.2.0）
 | # | 建议 | 影响 |
 |---|---|---|
 | C-1 | 输入检查表"7 项 / 10 项"口径统一，区分必需与后续输入 | rebuild-workflow S0 出口 |
