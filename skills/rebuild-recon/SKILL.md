@@ -5,7 +5,9 @@ version: 1.1.0
 owner: ElevenZhou
 ---
 
-# rebuild-recon — 侦察解包与静态分析
+# rebuild-recon — 侦察解包与静态分析（REA 联合模式）
+
+> 需要 Android 方法、调用引用、接口注解或存储证据时，读取上游 [rebuild-workflow/references/rea-integration.md](../rebuild-workflow/references/rea-integration.md)，用 REA 补强 JADX/Apktool 的结果。
 
 ## 何时用 / 何时不用
 - **用**：已有 scope.md 授权的自有安装包，需要了解其引擎、结构、SDK、接口、资源。
@@ -26,7 +28,13 @@ owner: ElevenZhou
 4. **资源清单**：`python scripts/asset_manifest.py extracted/ > assets/manifest.json`（按扩展名计数 + 体积，含全部分包）。
 5. **源码可恢复性结论**（写入 scope.md 与 docs/09）：逐项判断 ① 逻辑层可读程度（明文/字节码可反编译/加密/native）② 资源可导出程度 ③ 是否有加固 ④ 服务端依赖。结论给出 R1 近似源码恢复 / R2 契约+重写 / R3 仅资源复用 之一，交 `rebuild-workflow` S1 决策门。
 
+6. **REA Android 证据**：对 Android APK 按需执行 `inspect_android_package → search_android_classes → inspect_android_class → inspect_android_method → trace_android_references`。优先覆盖启动入口、核心页面、ViewModel/Controller、API interface、HTTP client、存储和安全边界。保存原始 Evidence JSON、Evidence ID、artifact SHA-256、provider 版本和 coverage；方法级证据不足时登记 unknown。
+
+7. **证据归档**：将 REA 结果与 `extracted/`、`recon/` 和 docs/03/04/07/09 交叉索引。REA 反编译源码只作为观察证据；不得宣称恢复原始工程、服务端或完整动态行为。
+
 S1 出口：引擎类型（附日志证据）、加固结论、资源总量清单（含全部分包）、源码可恢复性结论。
+
+S1/S2 联合出口增加：REA provider 可复现；关键类/方法和接口 Evidence 已归档；静态 coverage/unknown 已登记；R1/R2/R3 建议已写入 scope.md 和 docs/09。
 
 ## S2 九篇文档（固定编号与命名）
 
@@ -64,6 +72,9 @@ S2 出口：九篇齐全；09 篇里每个 P0 都标了计划在哪个里程碑�
 上游 `rebuild-workflow`（S0）→ 下游 `rebuild-asset-recovery`（S3）、`rebuild-product-design`（S4 使用九篇文档）。
 
 ## 变更记录
+- 1.2.0（2026-10-17）接入 REA Android/JADX 方法级证据和 Evidence 归档；补充静态 coverage/unknown 与 R1/R2/R3 联合出口。
 - 1.1.0（2026-10-16）哈希统一 sha256sum；强制解全部分包；新增步骤 5 源码可恢复性结论并写入 S1 出口；补 apktool 无 java 卡死、RN 大包慢两条坑（项目 C/F 复盘 C-4/C-9/F-2/F-4）。
 - 1.0.1（2026-10-02）detect_engine.py 识别 Hermes 字节码版本、Expo 配置与 XAPK 分包（项目 C）。
 - 1.0.0（2026-10-01）项目 D 提炼。
+
+

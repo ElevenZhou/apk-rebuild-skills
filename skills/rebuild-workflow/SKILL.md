@@ -1,11 +1,13 @@
 ---
 name: rebuild-workflow
-description: 自有 APK/游戏"源码丢失 → 逆向重建 → 再开发 → 交付工程+试玩包"全流程总控。接手任何"只有安装包没有源码、要重建成可迭代新工程"的项目时首先加载本 skill；它负责阶段划分、输入完整性检查、决策门、出口标准，并把具体阶段分派给其他 rebuild-* skill。触发词：逆向重建、源码丢失、离职未交接、APK 重建、重做一个同款、换皮重建。
+description: 自有或明确授权的 APK/游戏“源码丢失 → REA 逆向取证 → 重建 → 再开发 → 交付工程+试玩包”全流程总控。接手只有安装包、需要方法级静态分析、真机采证和可维护新工程的任务时使用；负责授权、阶段、决策门和出口，并调度 rebuild-* 与 REA。第三方产品无权属时仅做研究，不进入重建。
 version: 1.2.0
 owner: ElevenZhou
 ---
 
-# rebuild-workflow — 逆向重建全流程总控
+# rebuild-workflow — 逆向重建全流程总控（REA 联合模式）
+
+> REA 集成规则见 [references/rea-integration.md](references/rea-integration.md)。REA 负责逆向证据，本文负责授权、决策、重建和交付。
 
 ## 何时用 / 何时不用
 
@@ -25,6 +27,8 @@ owner: ElevenZhou
 | S6 真机采证校准 | 原包对标、数值口径采证、自家包验收（原包不可运行时只做新包验收） | `rebuild-device-evidence` | P0 占位全部关闭、转 AB 或经负责人审定 |
 | S7 打包交付 | 签名 APK、工程归档、交付清单 | `rebuild-build-release` | 交付清单逐项打勾 + 真机安装运行通过 + keystore 双人双地备份 |
 
+REA 作为横向证据层贯穿 S1/S2/S3/S6/S7：每个阶段只引用与该阶段出口匹配的 REA Evidence，不把静态完整覆盖当成原始源码恢复或运行时证明。
+
 > S5 与 S6 实际会交替进行（M4 = 真机校准）。阶段图见 `references/stage-map.md`。
 
 ## 六条铁律
@@ -43,6 +47,10 @@ owner: ElevenZhou
 3. 建目录：`docs/ evidence/ extracted/ assets/ rebuild/ recon/ runs/`。
 4. 原包 `sha256sum` 写入 scope.md。
 5. 让负责人确认 scope.md → 进入 S1（加载 `rebuild-recon`）。
+
+### REA 联合入口
+
+当输入是 APK/XAPK/APKS 且需要理解类、方法、接口、存储或调用链时，S1/S2 必须读取 `references/rea-integration.md`，并在 scope.md 记录：REA provider、JADX/APKTool 版本、是否启用 ADB、是否允许联网和真实账号。REA 失败或 coverage partial 时，降级为 R2/R3 并把阻塞写入 docs/09，不得跳过门禁。
 
 ## S1 源码可恢复性结论（必做，写进 recon/S1-事实基线.md）
 
@@ -85,6 +93,9 @@ owner: ElevenZhou
 `rebuild-recon` · `rebuild-asset-recovery` · `rebuild-product-design` · `rebuild-dev-milestones` · `rebuild-device-evidence` · `rebuild-build-release`
 
 ## 变更记录
+- 1.3.0（2026-10-17）新增 REA 联合模式：统一逆向证据、Evidence 归档、ADB 真机证据、R1/R2/R3 决策和第三方 APK 权属边界；详见 `references/rea-integration.md`。
 - 1.2.0（2026-10-16）输入检查表分必需/后续两类（C/S 型 #10 必需）；铁律 1 明确未勾选即未授权；S1 出口加源码可恢复性结论；既有门禁以严者为准；决策门扩到 D9；S3/S6/S7 出口同步（项目 C、F 反馈）。
 - 1.1.0（2026-10-16）引擎适配新增 react-native-hermes（项目 C）、unity-il2cpp（项目 F）。
 - 1.0.0（2026-10-01）从项目 D（Meowdoku → PawStar，Godot 4.6）全程提炼。
+
+

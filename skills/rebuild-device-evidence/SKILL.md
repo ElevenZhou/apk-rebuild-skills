@@ -1,11 +1,13 @@
 ---
 name: rebuild-device-evidence
-description: 真机采证与验收：通过 ADB 全自动操作安卓真机（启动、截图、像素定位点击、录屏），或对用户自然游玩录屏做场景切变抽帧，再交给视觉模型读取画面状态，用于对标原包数值口径、校准 P0 占位、验收自家新包。单独使用场景：任何手游/应用的真机自动化测试与录屏分析。触发词：真机测试、ADB 截图、采证、录屏分析、抽帧、实机验证、数值校准。
+description: 真机采证与验收，联合 REA ADB 设备证据：启动、截图、日志、像素定位点击、录屏和场景抽帧，用于授权 APK 对标、P0 校准和自家新包验收。用于真机测试、ADB 截图、运行时证据、录屏分析、实机验证和数值校准；不绕过登录、风控或服务端控制。
 version: 1.1.0
 owner: ElevenZhou
 ---
 
-# rebuild-device-evidence — 真机采证与验收
+# rebuild-device-evidence — 真机采证与验收（REA/ADB 联合模式）
+
+> REA 集成规则见 [rebuild-workflow/references/rea-integration.md](../rebuild-workflow/references/rea-integration.md)。REA 提供设备清单、设备属性、截图、日志和受控状态证据；本技能负责场景、截图归档和验收判断。
 
 ## 何时用 / 何时不用
 - **用**：M4 数值口径对标原包；每个里程碑在真机上验收自家包；S7 交付前冒烟。
@@ -20,6 +22,8 @@ owner: ElevenZhou
 - 安卓真机，已开 USB 调试，`adb devices` 能看到；原包和/或自家包已安装。
 - Python 3 + `pillow numpy opencv-python`。
 - 视觉模型（可选）：环境变量 `VISION_API_URL`、`VISION_API_KEY`、`VISION_MODEL`（Gemini 兼容接口）。**Key 不写进脚本、不提交仓库。**
+
+REA 可选入口：先用 `list_adb_devices`、`inspect_adb_device` 固化设备和 Android 版本；用 `capture_adb_screen`、`read_adb_logcat` 保存带 Evidence ID 的证据。安装、启动、点击、登录、短信、联网和抓包仍以 scope.md 为准，REA 不会自动扩大授权。
 
 ## 通道一：ADB 全接管（短流程、需精确操作）
 ```bash
@@ -55,6 +59,8 @@ python scripts/vision_ask.py shot.png "当前是什么页面？读出关卡号�
 1. 数值写进工程 `cfg/`（校准值，注明来源截图）；
 2. 记录写进 `M4-<主题>采证.md` + 待优化清单关闭对应 P0。
 
+每个真机结论同时关联静态 Evidence（REA/JADX）与动态 Evidence（截图/日志/录屏）。两者冲突时保留冲突、降低置信度并进入 docs/09；截图或日志不能证明服务端业务成功，静态调用链也不能证明真实运行顺序。
+
 ## 常见坑
 - 视觉模型读数会前后不一致 → 关键数值用像素采样交叉验证；渐变色区域靠截图分类不可靠，改用交互反馈验证。
 - OpenCV `imwrite` 中文路径静默失败 → 脚本已改用 `imencode + 二进制写`。
@@ -64,5 +70,8 @@ python scripts/vision_ask.py shot.png "当前是什么页面？读出关卡号�
 被 `rebuild-dev-milestones`（M4 与每个 M 验收）、`rebuild-build-release`（交付冒烟）调用。
 
 ## 变更记录
+- 1.2.0（2026-10-17）接入 REA ADB 设备/截图/日志 Evidence，并要求静态与动态证据交叉索引；明确 scope.md 不扩大真实登录、短信、联网或抓包授权。
 - 1.1.0（2026-10-16）新增"原包能不能跑"前置判断：原包不可运行/联网时只做新包验收，数值在 S4 审定（项目 C 复盘 C-10）。
 - 1.0.0（2026-10-01）项目 D M4 采证 + APK 实机验收提炼；脚本参数化，视觉 Key 改环境变量。
+
+
