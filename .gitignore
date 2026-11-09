@@ -1,3 +1,6 @@
+# 本机看板定时任务配置（含各机器的绝对路径，每人一份，勿提交）
+skills/rebuild-workflow/scripts/dashboard-task-config.json
+
 # 本地密钥与凭据
 *.keystore
 *.jks

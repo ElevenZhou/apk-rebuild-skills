@@ -2,7 +2,7 @@
 
 > 版本：**v1.4.1（2026-11-09）**，与 `skills/rebuild-workflow/SKILL.md` 对齐（八阶段 S0–S7）
 > 用途：任何"只有 APK/EXE、无源码、需重建可迭代新项目"的任务，照此流程执行，不依赖执行者个人经验。
-> 配套：[docs/ARCHITECTURE.md](ARCHITECTURE.md)（v1.4.0 架构图：分层、流程、人机边界）、`自家APK逆向重建-技术方案.md`（工具选型与调研底稿）、`skills/rebuild-workflow/references/prior-art.md`（现成成果检索）
+> 配套：[docs/ARCHITECTURE.md](ARCHITECTURE.md)（**现行架构图**：分层、流程、工作台层、机器观测、人机边界）、`自家APK逆向重建-技术方案.md`（工具选型与调研底稿）、`skills/rebuild-workflow/references/prior-art.md`（现成成果检索）
 > 演进规则：每个项目结束后，把新踩的坑、新经验回写本文档与对应 skill，版本号 +0.1；**改完按 `retro-checklist.md` 同步到 GitHub / Y 盘 / 各 Agent 安装点**。
 
 ---

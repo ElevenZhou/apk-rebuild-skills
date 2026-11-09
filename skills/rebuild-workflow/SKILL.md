@@ -1,7 +1,7 @@
 ---
 name: rebuild-workflow
-description: 任意作品（自有 / 第三方 / 权属待确认）的“安装包 → REA 逆向取证 → 重建 → 再开发 → 交付工程+试玩包”全流程总控。接手只有安装包、需要方法级静态分析、真机采证和可维护新工程的任务时使用；负责权属登记、阶段、决策门、出口标准和发布门禁，并调度 rebuild-* 与 REA。正式发布前必须逐产品人工确认所有权，由人工执行发布，Agent 不得自动发布。输入可为本地 APK / 游戏名 / Google Play 链接 / 三方市场链接，A0 负责获取原包；多项目并行时按 project-layout.md 回写各项目 project.json 供看板聚合。
-version: 1.4.2
+description: 任意作品（自有 / 第三方 / 权属待确认）的“安装包 → REA 逆向取证 → 重建 → 再开发 → 交付工程+试玩包”全流程总控。接手只有安装包、需要方法级静态分析、真机采证和可维护新工程的任务时使用；负责权属登记、阶段、决策门、出口标准和发布门禁，并调度 rebuild-* 与 REA。正式发布前必须逐产品人工确认所有权，由人工执行发布，Agent 不得自动发布。输入可为本地 APK / 游戏名 / Google Play 链接 / 三方市场链接，A0 负责获取原包；多项目并行时按 project-layout.md 回写各项目 project.json，看板由定时重建 + 机器观测自动更新。
+version: 1.4.3
 owner: ElevenZhou
 ---
 
@@ -9,7 +9,7 @@ owner: ElevenZhou
 
 > REA 集成规则见 [references/rea-integration.md](references/rea-integration.md)。REA 负责逆向证据，本文负责权属登记、决策、重建、交付和发布门禁。
 > 现成成果与工具检索见 [references/prior-art.md](references/prior-art.md)。
-> 项目目录规范与看板状态源见 [references/project-layout.md](references/project-layout.md)。
+> 项目目录规范与看板状态源见 [references/project-layout.md](references/project-layout.md)；看板自动刷新见 [references/dashboard-autorefresh.md](references/dashboard-autorefresh.md)。
 
 ## 合规模型（v1.4.0 起，必读）
 
@@ -31,7 +31,7 @@ owner: ElevenZhou
 - **用**：任意作品，只剩 APK/XAPK/EXE，需要分析结构、重建成可维护新工程，并最终交付「工程源码 + 试玩 APK」；或只需竞品研究抽象 / 取证。
 - **不用**：只需改一个资源/文案的小修补 → 用 `rebuild-asset-recovery`；只需打包 → 用 `rebuild-build-release`。
 
-## 看板与状态回写（多项目并行，v1.4.2 起）
+## 看板与状态回写（多项目并行，v1.4.2 起；v1.4.3 自动刷新）
 
 多个项目并行时，进度与卡点**不靠记忆、不靠会话上下文**。每个项目根目录放一份 `project.json` 作为看板唯一状态源，规则见 [references/project-layout.md](references/project-layout.md)，模板 `templates/project/project.json`。
 
@@ -47,7 +47,17 @@ owner: ElevenZhou
 ```bash
 python scripts/build_dashboard.py --root "<项目父目录>" --out "<父目录>/通用工程/dashboard/index.html"
 python scripts/build_dashboard.py --root "<项目父目录>" --check
+# 无人值守：计划任务调 --once，或常驻 --watch --interval 900
 ```
+
+### 自动刷新（v1.4.3）
+
+**看板不该「AI 沟通一次才更新一次」。** 两层自动更新，细则与全部命令见 `dashboard-autorefresh.md`：
+
+- **状态层**：每轮构建扫描目录文件 mtime、阶段产物、卡点登记后的变动 → `signals.json`；发现「登记状态 vs 目录实际」不一致就列「🛰 机器观测 · 待核实」，可一键复制核实提示词。
+- **呈现层**：计划任务调 `--once` 或常驻 `--watch --interval 900`，每 15 分钟原子重建 `index.html` / `signals.json` / `watch.log`；页面自动重载并显示数据时间、倒计时与新鲜度告警（超 2 周期未更新标红）。
+
+**机器观测是旁证**：不自动改写 `project.json`、不判定阶段出口达标、不自动关闭卡点、不自动发布。目录里出现产物 != 阶段完成，须由人或 Agent 带依据回写。
 
 看板**只反映状态**：不判定阶段是否达标、不替代出口标准、不自动关闭卡点、不自动发布；G-PUBLISH 仍由人执行。本层不占 S 阶段编号，不改七条铁律、D1–D9 与输入检查表。
 
@@ -176,6 +186,7 @@ P 层用到的外部能力（按 `prior-art.md` 的准入清单）：
 `rebuild-recon` · `rebuild-asset-recovery` · `rebuild-product-design` · `rebuild-dev-milestones` · `rebuild-device-evidence` · `rebuild-build-release`
 
 ## 变更记录
+- 1.4.3（2026-11-09）新增**看板自动刷新**：机器观测层（`signals.json` / 待核实提示 / 核实提示词）、`--watch` `--once` `--interval` `--refresh-sec` 定时重建、页面自刷新与新鲜度告警、计划任务脚本；配套 `dashboard-autorefresh.md`。
 - 1.4.2（2026-11-09）新增**看板与状态回写**：项目目录规范 `project-layout.md`、`project.json` 模板、离线看板生成器 `build_dashboard.py`；新增状态回写时机与卡点登记要求（横切层，不改阶段编号与门禁）。
 - 1.4.1（2026-11-09）新增 **A0 原包获取**：本地包直接进 S0；游戏名 / Google Play 链接 / 三方市场链接由 `fetch_artifact.py` 下载并留痕；新增 `artifact-acquisition.md`；不改八阶段编号、铁律、门禁。
 - 1.4.0（2026-11-09）合规模型改为「分析放行 / 发布管控」：允许所有作品进入流程，权属改为状态登记；新增 **G-PUBLISH 发布人工门禁**（逐产品人工确认所有权、人工发布）；新增 P0/P4 横切检查点与 `prior-art.md` 外部能力清单；铁律扩为七条；置信度体系加 external-reference 旁证；S0/S7 出口同步。

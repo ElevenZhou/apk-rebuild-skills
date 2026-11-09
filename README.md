@@ -2,7 +2,7 @@
 
 公司内部用的 **AI Agent Skill 包**：把「安装包 → 逆向取证 → 重建 → 再开发 → 交付工程 + 试玩 APK」整套流程固化下来。目标是让任何同事接手这类项目时都按同一套流程、同一套出口标准走，不依赖个人经验。
 
-适用于 WorkBuddy / CodeBuddy / Claude Code / Codex / Trae CN / OpenCode 等支持 `SKILL.md` 的 Agent 工具。当前版本见 [CHANGELOG.md](CHANGELOG.md)（**v1.4.2**）。
+适用于 WorkBuddy / CodeBuddy / Claude Code / Codex / Trae CN / OpenCode 等支持 `SKILL.md` 的 Agent 工具。当前版本见 [CHANGELOG.md](CHANGELOG.md)（**v1.4.3**）。
 
 > ## ⚠️ 合规模型（v1.4.0 起）
 >
@@ -31,7 +31,7 @@ python skills/rebuild-workflow/scripts/fetch_artifact.py --play-url "<Play 链�
 
 细则见 `skills/rebuild-workflow/references/artifact-acquisition.md`。**同名游戏候选、包名版本不符、来源可疑时必须由负责人确认**；付费 / 登录 / 区域受限应用由负责人提供已合法取得的包体，脚本不绕过反爬、验证码或会员墙。留痕文件 `input/artifact-source.json` 要写进 `scope.md`。
 
-## 项目看板（多项目并行，v1.4.2）
+## 项目看板（多项目并行，v1.4.2；v1.4.3 起自动刷新）
 
 同时推进多个项目时，看进度、找卡点、把项目交给 AI 工具接手，都从看板进：
 
@@ -42,10 +42,27 @@ python skills/rebuild-workflow/scripts/fetch_artifact.py --play-url "<Play 链�
 | 接手项目 | 点「处理提示词」→ 粘进任意 AI 工具，提示词带项目路径、阶段、卡点、下一步和要读的文件 |
 | 重新生成 | `python skills/rebuild-workflow/scripts/build_dashboard.py --root "<项目父目录>" --out "<父目录>/通用工程/dashboard/index.html"` |
 | 查规范 | `--check` 做 schema / 目录规范检查；规则见 `skills/rebuild-workflow/references/project-layout.md` |
+| **自动刷新** | **每 15 分钟自动重建 + 页面自动重载**，无需 AI 对话或手动跑脚本；见下方 |
 
-**状态源在每个项目根的 `project.json`**（模板 `templates/project/project.json`）。Agent 每次阶段切换、卡点变化、会话结束前必须回写，否则看板会过期；看板不判定出口标准、不自动关闭卡点、不自动发布。存量项目渐进迁移，不搬动大文件。
+**状态源在每个项目根的 `project.json`**（模板 `templates/project/project.json`）。Agent 每次阶段切换、卡点变化、会话结束前必须回写；看板不判定出口标准、不自动关闭卡点、不自动发布。存量项目渐进迁移，不搬动大文件。
 
-## 架构总览（v1.4.2）
+### 不用等 AI 对话，看板自己会更新（v1.4.3）
+
+| 层 | 做什么 |
+|---|---|
+| 机器观测 | 每轮扫描目录文件活动与阶段产物，发现「登记状态 vs 目录实际」不一致 → 「🛰 机器观测 · 待核实」+ 一键复制核实提示词 |
+| 定时重建 | 计划任务调 `--once`，或 `--watch --interval 900` 常驻；原子写 `index.html` / `signals.json` / `watch.log` |
+| 页面自刷新 | 每 15 分钟自动重载，显示数据时间、倒计时；超过 2 个周期没新数据会标红提示检查任务 |
+
+注册一次即可（在**有权限的 PowerShell** 里执行，路径按实际改）：
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "C:\Users\<用户>\apk-rebuild-skills\skills\rebuild-workflow\scripts\install_dashboard_task.ps1" -Root "<项目父目录>" -Out "<父目录>\通用工程\dashboard\index.html" -IntervalMinutes 15
+```
+
+`-Status` 查询 / `-RunOnce` 手动触发 / `-Uninstall` 卸载；若计划任务被策略拦截，改用 `build_dashboard.py --watch --interval 900` 常驻终端。**机器观测只是旁证，不会自动改写 `project.json`、不判定阶段出口、不自动关卡点、不自动发布。** 细则见 `skills/rebuild-workflow/references/dashboard-autorefresh.md`。
+
+## 架构总览（v1.4.3）
 
 完整架构图（分层架构、端到端流程与人机边界、合规两线、外部能力接入位置）见 **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**；阶段级细节见 `skills/rebuild-workflow/references/stage-map.md`；原包获取见 `artifact-acquisition.md`。
 
@@ -68,7 +85,7 @@ flowchart LR
 
 | Skill | 版本 | 阶段 | 一句话 | 可单独使用 |
 |---|---|---|---|---|
-| `rebuild-workflow` | 1.4.2 | 总控 A0 + S0–S7 | **A0 原包获取**、**看板与状态回写**、合规模型、P0/P4 检查点、输入检查表、决策门、出口标准、发布门禁、复盘回写 | 入口 |
+| `rebuild-workflow` | 1.4.3 | 总控 A0 + S0–S7 | **A0 原包获取**、**看板自动刷新与机器观测**、合规模型、P0/P4 检查点、输入检查表、决策门、出口标准、发布门禁、复盘回写 | 入口 |
 | `rebuild-recon` | 1.3.0 | S1–S2 | 解包、引擎识别、REA 方法级证据、docs/01-09 九篇文档 | ✅ 只做分析 |
 | `rebuild-asset-recovery` | 1.3.0 | S3 | 资源回导（Godot 全套脚本 + RN 资源/i18n 脚本）、版权审查 | ✅ 只提资源 |
 | `rebuild-product-design` | 1.3.0 | S4 | P4 参考实现、产品文档、决策门 D1-D9、品牌、微创新、开发计划 | ✅ 规划新版本 |
@@ -180,7 +197,8 @@ powershell -ExecutionPolicy Bypass -File Y:\Skills\apk-rebuild-skills\install\in
 | 走发布门禁 | 用 rebuild-build-release 过一遍 G-PUBLISH，列出发布前还缺哪些人工确认 |
 | 看所有项目进度 / 卡点 | 打开 `通用工程/dashboard/index.html`，或说「重新生成项目看板」 |
 | 接手某个项目 | 在看板点「处理提示词」粘进 AI 工具；或说「按 project.json 推进项目F」 |
-| 更新项目状态 | 用 rebuild-workflow 推进项目F，结束前回写 `project.json` 并重新生成看板 |
+| 更新项目状态 | 用 rebuild-workflow 推进项目F，结束前回写 `project.json`（看板会自动刷新） |
+| 看板没自动更新 | 检查 `dashboard/watch.log`，或说「检查看板自动刷新任务」 |
 
 ### Agent 会在哪里停下来等你
 - **A0**：游戏名搜出多个候选包名、包名/版本与描述不符、来源可疑 → 由负责人确认，Agent 不自选
@@ -195,8 +213,8 @@ powershell -ExecutionPolicy Bypass -File Y:\Skills\apk-rebuild-skills\install\in
 
 ```
 skills/<skill>/SKILL.md          技能本体（Agent 读这个）
-skills/<skill>/references/       模板、速查表、引擎手册、prior-art / rea-integration / artifact-acquisition / project-layout（按需加载）
-skills/<skill>/scripts/          参数化脚本（fetch_artifact / build_dashboard），不含路径和密钥
+skills/<skill>/references/       模板、速查表、引擎手册、prior-art / rea-integration / artifact-acquisition / project-layout / dashboard-autorefresh（按需加载）
+skills/<skill>/scripts/          参数化脚本（fetch_artifact / build_dashboard / install_dashboard_task），不含路径和密钥
 templates/project/               新项目骨架（scope、task_spec、待优化清单、**project.json 看板状态源**）
 docs/SOP.md                      给人读的完整 SOP（八阶段 S0–S7）
 docs/cases/                      项目案例复盘

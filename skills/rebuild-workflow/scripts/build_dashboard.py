@@ -2,20 +2,31 @@
 # -*- coding: utf-8 -*-
 """项目看板生成器 — apk-rebuild-skills / rebuild-workflow
 
-扫描 <root>/项目*/project.json，生成离线单页 HTML 看板。
+扫描 <root>/项目*/project.json + 各项目目录的文件活动，生成离线单页 HTML 看板。
 零第三方依赖；数据内嵌 HTML，双击即可打开，不需要起服务或联网。
 
 用法：
-  python build_dashboard.py --root "<项目父目录>" --out "<输出 index.html>"
-  python build_dashboard.py --root "<项目父目录>" --check      # 只做规范/schema 检查
-规则见 references/project-layout.md。
+  python build_dashboard.py --root "<项目父目录>" --out "<输出 index.html>"   # 单次生成
+  python build_dashboard.py --root "<项目父目录>" --once                       # 计划任务用（静默）
+  python build_dashboard.py --root "<项目父目录>" --watch --interval 900       # 常驻，每 15 分钟重建
+  python build_dashboard.py --root "<项目父目录>" --check                      # 只做规范/schema 检查
+
+两层自动更新：
+  1) 机器观测：扫描文件 mtime / 阶段产物 / 卡点登记后的变动，产出 signals.json 与「待核实」提示；
+     只是旁证，不自动改写 project.json、不判定阶段出口标准。
+  2) 定时重建：--watch / --once + Windows 计划任务，原子写 HTML；页面每 refresh-sec 秒自动重载。
+规则见 references/project-layout.md 与 references/dashboard-autorefresh.md。
 """
 from __future__ import annotations
 
 import argparse
 import datetime as dt
+import itertools
 import json
+import os
 import sys
+import time
+from collections import deque
 from pathlib import Path
 
 SCHEMA_VERSION = "1.0"
@@ -34,6 +45,28 @@ REQUIRED = [
 CORE_DIRS = ["docs", "recon", "extracted", "evidence", "assets", "rebuild", "runs", "report"]
 CORE_FILES = ["project.json", "README.md", "scope.md"]
 STALE_DAYS = 7
+
+# ---- 机器观测层参数（限时、限量，避免每 15 分钟拖垮十几万文件的项目目录）----
+SIGNAL_SKIP_DIRS = {
+    ".git", "node_modules", "__pycache__", ".gradle", "Library", "Temp", "obj",
+    ".vs", ".idea", "venv", ".venv", ".pytest_cache", "extracted", "bins",
+}
+SIGNAL_SKIP_FILES = {"project.json", "signals.json", "index.html", "watch.log"}
+SIGNAL_MAX_FILES = 4000          # 单项目最多 stat 的文件数
+SIGNAL_BUDGET_SEC = 6.0          # 全轮扫描总时间预算（秒）
+SIGNAL_BUDGET_MIN = 0.6          # 单项目最低预算
+# 阶段产物存在性：只作旁证，出现产物 != 阶段出口达标
+ARTIFACT_RULES = [
+    ("A0", ["*.apk", "*.xapk", "*.aab", "*.exe", "input/*"]),
+    ("S0", ["scope.md", "task_spec.yaml"]),
+    ("S1", ["docs/01-*", "recon/*"]),
+    ("S2", ["docs/09-*", "semantics/*", "il2cpp-dump/*"]),
+    ("S3", ["assets/*"]),
+    ("S4", ["重建方案*.md", "notes/重建方案*.md", "开发计划.md", "notes/开发计划.md"]),
+    ("S5", ["rebuild/*", "M0-*"]),
+    ("S6", ["evidence/*", "*验收记录*"]),
+    ("S7", ["release/*"]),
+]
 
 
 def scan(root: Path):
@@ -108,7 +141,7 @@ def scan(root: Path):
     return projects, issues, unregistered, dirs
 
 
-def report(projects, issues, unregistered, dirs, root: Path):
+def report(projects, issues, unregistered, dirs, root: Path, signals=None):
     print(f"扫描目录：{root}")
     print(f"项目目录 {len(dirs)} 个 / 已建档 {len(projects)} 个 / 未建档 {len(unregistered)} 个")
     if unregistered:
@@ -127,6 +160,201 @@ def report(projects, issues, unregistered, dirs, root: Path):
     else:
         print("schema 与目录检查全部通过。")
     print("\n说明：目录缺项仅作提示，存量项目按 project-layout.md §5 渐进迁移，不强制搬动文件。")
+    if signals:
+        hits = [(name, s) for name, s in signals["projects"].items()
+                if any(h["level"] in ("warn", "alert") for h in s["hints"])]
+        print(f"机器观测：{len(signals['projects'])} 个项目已扫描，{len(hits)} 个存在状态待核实提示"
+              f"（限时 {signals['budget_sec']}s；截断 {len(signals['truncated'])} 个）。")
+        for name, s in hits:
+            print(f"  ! {name}: " + "；".join(h["text"] for h in s["hints"] if h["level"] in ("warn", "alert"))[:150])
+        print("  观测仅作旁证，不自动改写 project.json；确认后由人或 Agent 回写。")
+
+
+# ---------------- 机器观测层 ----------------
+
+def _days(s, today):
+    try:
+        return (today - dt.date.fromisoformat(s)).days
+    except Exception:
+        return None
+
+
+def _has_any(d: Path, patterns):
+    for pat in patterns:
+        try:
+            if next(itertools.islice(d.glob(pat), 1), None) is not None:
+                return True
+        except (OSError, ValueError):
+            continue
+    return False
+
+
+def _count(d: Path, cap=200):
+    if not d.is_dir():
+        return 0
+    try:
+        return sum(1 for _ in itertools.islice(d.iterdir(), cap))
+    except OSError:
+        return 0
+
+
+def _walk_activity(d: Path, since_ts: float, deadline: float, max_files: int):
+    # BFS 限时限量遍历，返回 (最新 mtime, 扫描文件数, since 之后变动数, 是否截断)
+    latest, n, changed, truncated = 0.0, 0, 0, False
+    q = deque([d])
+    while q:
+        if time.monotonic() > deadline or n >= max_files:
+            truncated = True
+            break
+        cur = q.popleft()
+        try:
+            with os.scandir(cur) as it:
+                for e in it:
+                    if time.monotonic() > deadline or n >= max_files:
+                        truncated = True
+                        break
+                    try:
+                        if e.is_dir(follow_symlinks=False):
+                            if e.name not in SIGNAL_SKIP_DIRS:
+                                q.append(Path(e.path))
+                            continue
+                        if e.name in SIGNAL_SKIP_FILES or e.name.endswith(".tmp"):
+                            continue
+                        st = e.stat(follow_symlinks=False)
+                    except OSError:
+                        continue
+                    n += 1
+                    if st.st_mtime > latest:
+                        latest = st.st_mtime
+                    if st.st_mtime > since_ts:
+                        changed += 1
+        except OSError:
+            continue
+    return latest, n, changed, truncated
+
+
+def collect_signals(projects):
+    # 扫描目录活动与阶段产物，产出旁证；绝不修改 project.json
+    today = dt.date.today()
+    per = max(SIGNAL_BUDGET_MIN, SIGNAL_BUDGET_SEC / max(1, len(projects)))
+    idx = {s: i for i, s in enumerate(STAGES)}
+    out = {
+        "schema_version": "1.0",
+        "generated_at": dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "budget_sec": SIGNAL_BUDGET_SEC,
+        "note": "机器观测是旁证：不自动改写 project.json，不判定阶段出口标准，不自动解除卡点。",
+        "projects": {},
+        "truncated": [],
+    }
+    for p in projects:
+        d = Path(p["_path"])
+        try:
+            since_ts = dt.datetime.fromisoformat(p["updated_at"]).timestamp()
+        except Exception:
+            since_ts = 0.0
+        latest, n, changed, truncated = _walk_activity(
+            d, since_ts, time.monotonic() + per, SIGNAL_MAX_FILES)
+        present = [s for s, pats in ARTIFACT_RULES if _has_any(d, pats)]
+        observed = max(present, key=lambda s: idx[s]) if present else None
+        activity_days = (today - dt.date.fromtimestamp(latest)).days if latest else None
+        stage_gap = bool(observed and p.get("stage") in idx and idx[observed] > idx[p["stage"]])
+        hints = []
+        stale = p.get("_stale") or 0
+        if p.get("status") == "active" and stale > STALE_DAYS:
+            hints.append({"level": "warn", "text": f"标记「进行中」，但已 {stale} 天未回写 project.json"})
+        if p.get("status") == "active" and activity_days is not None and activity_days > STALE_DAYS:
+            hints.append({"level": "warn", "text": f"标记「进行中」，但目录已 {activity_days} 天无文件活动"})
+        if changed > 0:
+            hints.append({"level": "info", "text": f"距上次回写后目录有 {changed} 个文件变动，建议核实状态"})
+        if stage_gap:
+            hints.append({"level": "alert", "text":
+                f"目录出现更靠后的产物（观测 {observed} / 登记 {p.get('stage')}），需人工或 Agent 核实"})
+        blockers = p.get("blockers") or []
+        if p.get("_blocking") and changed > 0:
+            hints.append({"level": "warn", "text":
+                f"存在阻塞卡点，但登记后目录有 {changed} 个文件变动，请确认卡点是否已解除"})
+        for b in blockers:
+            age = _days(b.get("since", ""), today)
+            if age is not None and age > 14 and b.get("severity") in ("blocking", "waiting"):
+                hints.append({"level": "warn", "text":
+                    f"卡点 {b.get('id', '?')} 已挂 {age} 天，建议升级处理或重新评估"})
+        out["projects"][p["_dir"]] = {
+            "last_activity_at": dt.datetime.fromtimestamp(latest).strftime("%Y-%m-%d %H:%M") if latest else None,
+            "activity_days": activity_days,
+            "files_scanned": n,
+            "changed_since_update": changed,
+            "artifacts": present,
+            "observed_stage": observed,
+            "stage_gap": stage_gap,
+            "evidence_files": _count(d / "evidence"),
+            "release_files": _count(d / "release"),
+            "hints": hints,
+        }
+        if truncated:
+            out["truncated"].append(p["_dir"])
+    return out
+
+
+# ---------------- 原子写与单轮构建 ----------------
+
+def atomic_write(path: Path, text: str):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_name(path.name + ".tmp")
+    tmp.write_text(text, encoding="utf-8")
+    os.replace(tmp, path)
+
+
+def append_log(path: Path, line: str, cap=512 * 1024):
+    try:
+        old = path.read_text(encoding="utf-8") if path.is_file() else ""
+        text = old + line + "\n"
+        while len(text.encode("utf-8")) > cap:
+            text = text[text.find("\n") + 1:] if "\n" in text else ""
+        atomic_write(path, text)
+    except OSError:
+        pass
+
+
+def build_once(root: Path, out: Path, refresh_sec: int, do_signals: bool, quiet: bool):
+    t0 = time.monotonic()
+    projects, issues, unregistered, dirs = scan(root)
+    if not quiet:
+        report(projects, issues, unregistered, dirs, root)
+    signals = collect_signals(projects) if do_signals else None
+    stamp = dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    payload = {
+        "generated_at": stamp,
+        "root": root.as_posix(),
+        "refresh_sec": refresh_sec,
+        "projects": projects,
+        "unregistered": unregistered,
+        "issues": issues,
+        "signals": signals,
+    }
+    raw = json.dumps(payload, ensure_ascii=False).replace("</", "<\\/")
+    meta = f'<meta http-equiv="refresh" content="{refresh_sec}">' if refresh_sec > 0 else ''
+    html = (HTML.replace("__DASHBOARD_DATA__", raw)
+                .replace("__GENERATED_AT__", stamp)
+                .replace("__REFRESH_META__", meta))
+    atomic_write(out, html)
+    if signals is not None:
+        atomic_write(out.parent / "signals.json",
+                     json.dumps(signals, ensure_ascii=False, indent=2) + "\n")
+    blocking = sum(p["_blocking"] for p in projects)
+    waiting = sum(p["_waiting"] for p in projects)
+    hints = sum(1 for s in (signals["projects"].values() if signals else [])
+                if any(h["level"] in ("warn", "alert") for h in s["hints"]))
+    line = (f"[{stamp}] projects={len(projects)} blocking={blocking} waiting={waiting} "
+            f"issues={len(issues)} review={hints} elapsed={time.monotonic()-t0:.2f}s")
+    append_log(out.parent / "watch.log", line)
+    if not quiet:
+        print(f"\n看板已生成：{out}")
+        print(f"  项目 {len(projects)} 个 | 阻塞卡点 {blocking} 项 | 待人工 {waiting} 项 | 提示 {len(issues)} 条")
+        print(f"  机器观测：{hints} 个项目状态待核实；signals.json 与 watch.log 已更新")
+        print(f"  页面自动刷新：每 {refresh_sec} 秒重载（离线 file:// 可用）；数据已内嵌，无需服务。")
+    else:
+        print(line)
+    return hints
 
 
 HTML = r'''<!DOCTYPE html>
@@ -135,6 +363,7 @@ HTML = r'''<!DOCTYPE html>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>项目看板 · 逆向重建工作台</title>
+__REFRESH_META__
 <style>
 :root{
   --bg:#f4f6f9; --card:#fff; --ink:#19212f; --sub:#4c5666; --muted:#828c9c;
@@ -245,6 +474,14 @@ pre.prompt{background:#f7f9fc;border:1px solid var(--line);border-radius:8px;pad
 .toast{position:fixed;left:50%;bottom:28px;transform:translate(-50%,20px);background:#19212f;color:#fff;
   padding:10px 18px;border-radius:8px;font-size:13px;opacity:0;pointer-events:none;transition:.2s;z-index:30}
 .toast.on{opacity:1;transform:translate(-50%,0)}
+.fresh-ok{color:var(--green);font-weight:600} .fresh-warn{color:var(--red);font-weight:600}
+.b-signal{background:var(--amber-soft);color:var(--amber)}
+.sig{display:grid;grid-template-columns:96px 1fr auto;gap:14px;align-items:center;padding:11px 18px;border-bottom:1px solid #f0f2f6}
+.sig:last-child{border-bottom:0}
+.sig.lv-alert{background:var(--red-soft)} .sig.lv-warn{background:var(--amber-soft)}
+.sig .who{font-size:12px;font-weight:700;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.sig .what{font-size:13px;font-weight:600}
+.sig .meta{font-size:11.5px;color:var(--muted);margin-top:2px}
 @media(max-width:760px){.wrap{padding:18px 14px 60px}.grid{grid-template-columns:1fr}
   .att{grid-template-columns:1fr;gap:6px}.att .acts{justify-content:flex-start}}
 </style>
@@ -256,7 +493,10 @@ pre.prompt{background:#f7f9fc;border:1px solid var(--line);border-radius:8px;pad
       <h1>项目看板 <span style="font-weight:400;color:var(--muted);font-size:18px">· 逆向重建工作台</span></h1>
       <div class="sub">A0 + S0–S7 主线 · 卡点优先 · 点击「处理提示词」即可把项目交给 AI 工具接手</div>
     </div>
-    <div class="stamp">生成时间：__GENERATED_AT__<br>数据源：各项目 <code>project.json</code>（离线内嵌，无需服务）</div>
+    <div class="stamp">数据生成：<b>__GENERATED_AT__</b><br>
+      <span id="freshness"></span>　<span id="countdown"></span>
+      <button class="ghost" style="padding:2px 8px" onclick="location.reload()">立即刷新</button><br>
+      数据源：project.json + 机器观测（离线内嵌，无需服务）</div>
   </header>
 
   <div class="stats" id="stats"></div>
@@ -266,6 +506,12 @@ pre.prompt{background:#f7f9fc;border:1px solid var(--line);border-radius:8px;pad
     <div class="panel-h"><h2>⚑ 需要你处理</h2><span class="pill" id="attCount">0 项</span>
       <span style="margin-left:auto;font-size:12px;color:var(--muted)">按阻塞 → 待人工排序，只列需要人或外部资源的项目</span></div>
     <div class="attention-list" id="attention"></div>
+  </section>
+
+  <section class="panel" id="signalPanel" style="display:none">
+    <div class="panel-h"><h2>🛰 机器观测 · 待核实</h2><span class="pill" id="sigCount">0 项</span>
+      <span style="margin-left:auto;font-size:12px;color:var(--muted)">定时扫描目录活动；仅作旁证，不自动改写 project.json</span></div>
+    <div class="attention-list" id="signals"></div>
   </section>
 
   <div class="toolbar">
@@ -279,9 +525,11 @@ pre.prompt{background:#f7f9fc;border:1px solid var(--line);border-radius:8px;pad
     <span style="font-size:12px;color:var(--muted)" id="shown"></span>
   </div>
 
-  <div class="note"><b>状态怎么保持新鲜：</b>AI 每次推进项目（阶段切换、卡点变化、会话结束）必须回写该项目 <code>project.json</code> 的
-    <code>stage / completed / progress / blockers / next_action / updated_at</code>，再重新生成看板；超过 7 天未回写会标「数据可能过时」。
-    看板只反映状态，不判定出口标准、不替代 G-PUBLISH 人工发布门禁。</div>
+  <div class="note"><b>看板怎么自动更新：</b>开启定时重建（计划任务或 <code>--watch</code>）后每 15 分钟自动重画，页面也会自动重载；
+    若超过 2 个刷新周期仍没有新数据，右上角会标红提醒检查定时任务。同时扫描各项目目录的文件活动与阶段产物，
+    发现「登记状态与目录实际不一致」就列到上方「机器观测」。<b>机器只报观测事实，不判定阶段出口、不自动关闭卡点、不自动发布。</b>
+    仍由 AI/人推进项目后回写 <code>project.json</code>（<code>stage / completed / progress / blockers / next_action / updated_at</code>），
+    核实提示可一键复制成「核实并回写」提示词交给 Agent。超过 7 天未回写会标「数据可能过时」。</div>
 
   <div class="grid" id="grid"></div>
   <div class="empty" id="empty" style="display:none">没有符合条件的项目</div>
@@ -298,7 +546,10 @@ pre.prompt{background:#f7f9fc;border:1px solid var(--line);border-radius:8px;pad
 <script id="dashboard-data" type="application/json">__DASHBOARD_DATA__</script>
 <script>
 const DB = JSON.parse(document.getElementById('dashboard-data').textContent);
-const P = DB.projects, ISSUES = DB.issues;
+const P = DB.projects, ISSUES = DB.issues, SIG = DB.signals;
+const REFRESH = DB.refresh_sec || 0;
+const sigOf = p => (SIG && SIG.projects && SIG.projects[p._dir]) || null;
+const reviewOf = p => { const s=sigOf(p); return s ? s.hints.filter(h=>h.level==='warn'||h.level==='alert') : []; };
 const ST = ['A0','S0','S1','S2','S3','S4','S5','S6','S7'];
 const LBL = {active:'进行中',blocked:'卡住','waiting-human':'待人工','not-started':'未启动',parked:'挂起',done:'已交付'};
 const SEV = {blocking:'阻塞',waiting:'待人工',risk:'风险',info:'记录'};
@@ -333,7 +584,7 @@ ${bt}
 要求：
 1. 加载 rebuild-workflow，按当前阶段分派对应 skill，执行出口标准与决策门；需要人工决策就停下来问，不要自行拍板。
 2. 只做 scope.md 已勾选的分析范围；不确定项登记进待优化清单并标置信度。
-3. 会话结束前按 project-layout.md 回写 project.json（stage / completed / progress / blockers / next_action / updated_at），重新生成看板，并说明本次改了什么。`;
+3. 会话结束前按 project-layout.md 回写 project.json（stage / completed / progress / blockers / next_action / updated_at），并说明本次改了什么；开启定时重建后看板会自动刷新，未开启时手动跑一次 build_dashboard.py。`;
 }
 function stagesBar(p){
   if(p.track!=='rebuild') return `<div class="stages">${ST.map(s=>'<div class="st future"></div>').join('')}</div>
@@ -350,8 +601,10 @@ function renderStats(){
   P.forEach(p=>{ if(c[p.status]!==undefined) c[p.status]++; });
   const blocking = P.reduce((n,p)=>n+p._blocking,0), waiting = P.reduce((n,p)=>n+p._waiting,0);
   const stale = P.filter(p=>p._stale!=null && p._stale>7).length;
+  const review = P.filter(p=>reviewOf(p).length).length;
   const items=[['项目总数',P.length,''],['阻塞卡点',blocking,'alert'],['待人工卡点',waiting,'warn'],
-    ['进行中项目',c.active,''],['待人工/挂起项目',c['waiting-human']+c.parked,''],['未启动项目',c['not-started'],''],['已交付项目',c.done,'good'],['数据可能过时',stale,stale?'warn':'']];
+    ['状态待核实',review,review?'warn':''],['进行中项目',c.active,''],['待人工/挂起项目',c['waiting-human']+c.parked,''],
+    ['未启动项目',c['not-started'],''],['已交付项目',c.done,'good'],['数据可能过时',stale,stale?'warn':'']];
   $('stats').innerHTML = items.map(([l,v,k])=>`<div class="stat ${k}"><b>${v}</b><span>${l}</span></div>`).join('');
 }
 
@@ -383,6 +636,7 @@ function card(p){
   return `<article class="card s-${esc(p.status)}" onclick="openDrawer('${esc(p.id)}')">
     <div class="card-h"><div><div class="nm">${esc(p.name)}</div><div class="pd">${esc(p.product)} · ${esc(p.package)}</div></div>
       <div class="badges"><span class="badge b-${esc(p.status)}">${esc(LBL[p.status]||p.status)}</span>
+      ${reviewOf(p).length?'<span class="badge b-signal">⚠ 待核实</span>':''}
       ${p.track!=='rebuild'?`<span class="badge b-track">${esc(p.track)}</span>`:''}</div></div>
     <div class="engine">${esc(p.engine)}　·　${esc(p.stage)}${p.milestone?' / '+esc(p.milestone):''}</div>
     ${stagesBar(p)}
@@ -390,7 +644,7 @@ function card(p){
     <div class="next"><b>下一步 →</b> ${esc(p.next_action)}</div>
     ${bs.slice(0,2).map(b=>`<div class="blk-line ${esc(b.severity)}"><span class="ic">${b.severity==='blocking'?'⛔':'⏳'}</span><span>${esc(b.title)}</span></div>`).join('')}
     ${bs.length>2?`<div style="font-size:11.5px;color:var(--muted)">还有 ${bs.length-2} 项卡点，点卡片查看</div>`:''}
-    <div class="card-f"><div class="when ${stale?'stale':''}">${esc(p.updated_at)}${stale?` · ${p._stale} 天未回写 ⚠`:''}　·　${esc(p.owner)}</div>
+    <div class="card-f"><div class="when ${stale?'stale':''}">${esc(p.updated_at)}${stale?` · ${p._stale} 天未回写 ⚠`:''}${sigOf(p)&&sigOf(p).last_activity_at?` · 🛰 ${esc(sigOf(p).last_activity_at.slice(5,16))}`:''}　·　${esc(p.owner)}</div>
       <div class="acts" onclick="event.stopPropagation()">
         <button class="primary" onclick="copyPrompt('${esc(p.id)}')">处理提示词</button>
         <button onclick="copyPath('${esc(p.id)}')">复制路径</button>
@@ -443,6 +697,11 @@ function openDrawer(id){
     <div class="sec"><h3>关键文件</h3><div class="files">${files||'<span style="color:var(--muted)">未登记</span>'}</div>
       ${links?`<div style="margin-top:10px;font-size:12.5px;color:var(--sub)">${links}</div>`:''}</div>
     ${p._missing&&p._missing.length?`<div class="sec"><h3>目录规范检查</h3><div style="font-size:12.5px;color:var(--muted)">缺 ${esc(p._missing.join('、'))}（存量项目渐进迁移，不强制补）</div></div>`:''}
+    ${sigOf(p)?`<div class="sec"><h3>机器观测（旁证，${esc(SIG.generated_at)}）</h3><div class="obs">
+      最近文件活动：<b>${esc(sigOf(p).last_activity_at||'未知')}</b>　·　距上次回写后 <b>${sigOf(p).changed_since_update}</b> 个文件变动<br>
+      观测到的阶段产物：${esc((sigOf(p).artifacts||[]).join('、')||'无')}　·　观测阶段：<b>${esc(sigOf(p).observed_stage||'未知')}</b><br>
+      证据文件 ${sigOf(p).evidence_files} 个　·　交付物 ${sigOf(p).release_files} 个　·　本轮扫描 ${sigOf(p).files_scanned} 个文件<br>
+      <span style="color:var(--muted)">产物出现 ≠ 阶段出口达标；观测不会自动改写 project.json。</span></div></div>`:''}
     <div class="sec"><h3>处理提示词（复制到 AI 工具即可接手）</h3>
       <div style="display:flex;gap:8px;margin-bottom:9px"><button class="primary" onclick="copyPrompt('${esc(p.id)}')">复制处理提示词</button>
       <button onclick="copyPath('${esc(p.id)}')">复制项目路径</button><button onclick="openDir('${esc(p.id)}')">打开目录</button></div>
@@ -452,9 +711,60 @@ function openDrawer(id){
   $('drawer').classList.add('on'); $('mask').classList.add('on');
 }
 function closeDrawer(){ $('drawer').classList.remove('on'); $('mask').classList.remove('on'); }
+
+function verifyPrompt(p,s,h){
+  return `用 rebuild-workflow 核实并更新${p.name}的看板状态。
+项目目录：${p._path}
+登记状态：${p.stage} / ${LBL[p.status]||p.status} / ${p.progress}%，最后回写 ${p.updated_at}。
+机器观测（${SIG.generated_at}）：最近文件活动 ${s.last_activity_at||'未知'}；距上次回写后 ${s.changed_since_update} 个文件变动；
+观测到的阶段产物 ${(s.artifacts||[]).join('、')||'无'}（观测阶段 ${s.observed_stage||'未知'}）。
+待核实提示：${h.text}
+
+请核对目录实际产物与 project.json 登记是否一致：
+1. 只把已确认的事实回写 project.json；stage / completed 前移必须有阶段出口标准支撑，不能仅凭「文件存在」判定阶段完成。
+2. 解除或新增卡点需要依据，涉及人工确认的停下来问，不要自行拍板。
+3. 更新 updated_at / next_action / summary，说明本次改了什么；开启定时重建后看板会自动刷新。`;
+}
+function copyVerify(id,i){ const p=byId(id), s=p&&sigOf(p); if(!s) return;
+  const h=s.hints.filter(x=>x.level==='warn'||x.level==='alert')[i]; if(h) copy(verifyPrompt(p,s,h), p.name+' 核实提示词'); }
+function renderSignals(){
+  const rows=[];
+  P.forEach(p=>reviewOf(p).forEach((h,i)=>rows.push({p,h,i,s:sigOf(p)})));
+  rows.sort((a,b)=>(a.h.level==='alert'?0:1)-(b.h.level==='alert'?0:1));
+  $('signalPanel').style.display=rows.length?'block':'none';
+  $('sigCount').textContent=rows.length+' 条 / '+new Set(rows.map(r=>r.p.id)).size+' 项目';
+  $('signals').innerHTML=rows.length?rows.map(({p,h,i,s})=>
+    `<div class="sig lv-${esc(h.level)}">
+      <div class="who" title="${esc(p.name)}">${esc(p.name)}</div>
+      <div><div class="what">${h.level==='alert'?'⛔':'⚠'} ${esc(h.text)}</div>
+        <div class="meta">最近活动：${esc(s.last_activity_at||'未知')}　·　产物阶段：${esc(s.observed_stage||'未知')}
+          　·　变动 ${s.changed_since_update} 个文件　·　扫描 ${s.files_scanned} 个文件</div></div>
+      <div class="acts"><button class="primary" onclick="copyVerify('${esc(p.id)}',${i})">核实提示词</button>
+        <button onclick="openDrawer('${esc(p.id)}')">详情</button></div>
+    </div>`).join('') : '';
+}
+function startClock(){
+  const gen=new Date(String(DB.generated_at).replace(/-/g,'/'));
+  const loaded=Date.now();
+  function tick(){
+    const age=Math.floor((Date.now()-gen.getTime())/60000);
+    const f=$('freshness'), c=$('countdown');
+    if(f){
+      const bad=REFRESH && age>Math.ceil(REFRESH/60*2);
+      f.className=bad?'fresh-warn':'fresh-ok';
+      f.textContent=bad?`⚠ 数据已 ${age} 分钟未更新，自动刷新可能已停止`:`✓ 数据 ${age===0?'刚刚':age+' 分钟前'}更新`;
+    }
+    if(c){
+      if(!REFRESH){ c.textContent='自动刷新已关闭'; return; }
+      const left=Math.max(0,REFRESH-Math.floor((Date.now()-loaded)/1000));
+      c.textContent=`下次刷新 ${String(Math.floor(left/60)).padStart(2,'0')}:${String(left%60).padStart(2,'0')}`;
+    }
+  }
+  tick(); setInterval(tick,1000);
+}
 document.addEventListener('keydown',e=>{if(e.key==='Escape')closeDrawer();});
 ['q','fstatus','sort'].forEach(id=>$(id).addEventListener(id==='q'?'input':'change',render));
-renderStats(); renderAttention();
+renderStats(); renderAttention(); renderSignals(); startClock();
 $('unregistered').innerHTML = DB.unregistered.length? `<div class="note" style="border-color:#f3d4a8;background:var(--amber-soft)">
   <b>⚠ 未建档目录：</b>${DB.unregistered.map(esc).join('、')} —— 这些目录没有 <code>project.json</code>，看板读不到状态。按 <code>templates/project/project.json</code> 补一份即可。</div>` : '';
 render();
@@ -465,41 +775,49 @@ render();
 
 
 def main():
-    ap = argparse.ArgumentParser(description="生成项目看板（离线单页 HTML）")
+    ap = argparse.ArgumentParser(description="生成项目看板（离线单页 HTML + 机器观测）")
     ap.add_argument("--root", default=".", help="项目父目录（其下为 项目* 子目录）")
     ap.add_argument("--out", default="dashboard/index.html", help="输出 HTML 路径")
     ap.add_argument("--check", action="store_true", help="只做 schema / 目录规范检查，不生成 HTML")
     ap.add_argument("--strict", action="store_true", help="--check 时如存在提示项则返回非零退出码")
+    ap.add_argument("--watch", action="store_true", help="常驻循环，每 --interval 秒重建一次")
+    ap.add_argument("--once", action="store_true", help="单次静默重建（供 Windows 计划任务调用）")
+    ap.add_argument("--interval", type=int, default=900, help="--watch 间隔秒数，默认 900（15 分钟）")
+    ap.add_argument("--refresh-sec", type=int, default=900,
+                    help="页面自动重载秒数，默认 900；0 = 关闭页面自动刷新")
+    ap.add_argument("--no-signals", action="store_true", help="跳过机器观测（只按 project.json 重画）")
+    ap.add_argument("--quiet", action="store_true", help="不打印完整扫描报告")
     args = ap.parse_args()
 
     root = Path(args.root).resolve()
     if not root.is_dir():
         print(f"ERROR: 目录不存在 {root}", file=sys.stderr)
         return 2
-    projects, issues, unregistered, dirs = scan(root)
-    report(projects, issues, unregistered, dirs, root)
+    out = Path(args.out).resolve()
 
     if args.check:
+        projects, issues, unregistered, dirs = scan(root)
+        report(projects, issues, unregistered, dirs, root)
         return 1 if (args.strict and issues) else 0
 
-    payload = {
-        "generated_at": dt.datetime.now().strftime("%Y-%m-%d %H:%M"),
-        "root": root.as_posix(),
-        "projects": projects,
-        "unregistered": unregistered,
-        "issues": issues,
-    }
-    raw = json.dumps(payload, ensure_ascii=False).replace("</", "<\\/")
-    html = HTML.replace("__DASHBOARD_DATA__", raw).replace(
-        "__GENERATED_AT__", payload["generated_at"])
-    out = Path(args.out).resolve()
-    out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text(html, encoding="utf-8")
-    blocking = sum(p["_blocking"] for p in projects)
-    waiting = sum(p["_waiting"] for p in projects)
-    print(f"\n看板已生成：{out}")
-    print(f"  项目 {len(projects)} 个 | 阻塞卡点 {blocking} 项 | 待人工 {waiting} 项 | 提示 {len(issues)} 条")
-    print("  双击 HTML 即可离线打开；数据已内嵌，无需服务。")
+    do_signals = not args.no_signals
+    quiet = args.quiet or args.once
+    if args.watch:
+        print(f"看板自动刷新已启动：每 {args.interval} 秒重建 → {out}")
+        print("日志：%s（Ctrl+C 停止）" % (out.parent / "watch.log"))
+        while True:
+            try:
+                build_once(root, out, args.refresh_sec, do_signals, quiet=True)
+            except Exception as e:
+                append_log(out.parent / "watch.log",
+                           f"[{dt.datetime.now():%Y-%m-%d %H:%M:%S}] ERROR {type(e).__name__}: {e}")
+                print(f"ERROR: {type(e).__name__}: {e}", file=sys.stderr)
+            try:
+                time.sleep(max(30, args.interval))
+            except KeyboardInterrupt:
+                print("\n已停止。")
+                return 0
+    build_once(root, out, args.refresh_sec, do_signals, quiet)
     return 0
 
 

@@ -1,6 +1,6 @@
-# 架构图（v1.4.2）
+# 架构图（v1.4.3）
 
-> 日期：2026-11-09 ｜ 适用：`apk-rebuild-skills` v1.4.2 ｜ 配套：[SOP.md](SOP.md)、`skills/rebuild-workflow/references/stage-map.md`
+> 日期：2026-11-09 ｜ 适用：`apk-rebuild-skills` v1.4.3 ｜ 配套：[SOP.md](SOP.md)、`skills/rebuild-workflow/references/stage-map.md`
 >
 > 历史版本：2026-09 的 RescueBench 分层架构图 / S0–S9 流程图已归档，仅代表当时的设计，**不作为现行架构依据**（见文末「历史设计包」）。
 
@@ -15,7 +15,7 @@ flowchart TB
         U4["Trae CN"]
     end
 
-    subgraph CTL["总控层 · rebuild-workflow 1.4.2（唯一自建编排资产）"]
+    subgraph CTL["总控层 · rebuild-workflow 1.4.3（唯一自建编排资产）"]
         C0["A0 原包获取（流程第一步）<br/>有包就进 / 没包才下"]
         C1["合规模型：分析放行 / 发布管控"]
         C2["八阶段 S0–S7 + 出口标准 + 七条铁律"]
@@ -47,10 +47,12 @@ flowchart TB
         T4["Godot / Unity / JDK17 / Android build-tools"]
     end
 
-    subgraph BOARD["工作台层 · 多项目并行（v1.4.2 横切，不改阶段编号）"]
+    subgraph BOARD["工作台层 · 多项目并行（v1.4.2 起 / v1.4.3 自动刷新，横切不改阶段编号）"]
         B1["各项目根 project.json<br/>状态 / 进度 / 卡点 / 下一步"]
         B2["build_dashboard.py 聚合 + 规范检查"]
         B3["dashboard/index.html<br/>卡点置顶 · 一键复制处理提示词"]
+        B4["机器观测 collect_signals<br/>文件活动 / 阶段产物 / 待核实提示"]
+        B5["定时重建：计划任务 / --watch<br/>每 15 分钟原子写 + 页面自刷新"]
     end
 
     subgraph OUT["产出层"]
@@ -63,6 +65,9 @@ flowchart TB
     C0 --> C1
     CTL -. 阶段结束回写状态 .-> B1
     B1 --> B2 --> B3
+    B4 --> B2
+    B5 -. 每 15 分钟触发 .-> B2
+    B2 -. signals.json / watch.log .-> B4
     B3 -. 人工接手项目 .-> U1
     U1 --> CTL
     U2 --> CTL
@@ -80,7 +85,7 @@ flowchart TB
 
 **关键说明**
 
-- **工作台层是横切观察者**：只读各项目 `project.json` 生成看板，不判定出口标准、不改阶段编号、不自动关闭卡点、不自动发布；人从看板点「处理提示词」把项目交回 Agent。
+- **工作台层是横切观察者**：只读各项目 `project.json` 生成看板，不判定出口标准、不改阶段编号、不自动关闭卡点、不自动发布；人从看板点「处理提示词」把项目交回 Agent。v1.4.3 起增加机器观测（旁证）与每 15 分钟定时重建，**观测不改写权威状态、产物出现不等于阶段出口达标**。
 - **编排层是唯一自建资产**：工具层坏了换工具、模型层换了换 API 配置，总控与阶段 skill 的出口标准不变。
 - **横向能力层按需加载**：`references/` 与 `engines/` 由总控按阶段注入上下文，不一次塞满。
 - **A0 在流程最前**：本地包直接进 S0，否则由 `fetch_artifact.py` 按游戏名 / Play 链接 / 三方链接下载；它是输入 #1 的前置动作，不占 S 编号，也不改门禁结构。
@@ -164,7 +169,9 @@ flowchart LR
 |---|---|
 | `skills/rebuild-workflow/scripts/fetch_artifact.py` | A0 原包获取脚本（四种输入，参数化） |
 | `skills/rebuild-workflow/references/project-layout.md` | 工作台层规则（目录规范 / project.json schema / 状态回写） |
-| `skills/rebuild-workflow/scripts/build_dashboard.py` | 工作台层生成器（离线 HTML 看板 + `--check`） |
+| `skills/rebuild-workflow/scripts/build_dashboard.py` | 工作台层生成器（离线 HTML 看板 + 机器观测 + `--check` / `--watch` / `--once`） |
+| `skills/rebuild-workflow/scripts/install_dashboard_task.ps1` | 工作台层定时器（Windows 计划任务注册 / 查询 / 卸载） |
+| `skills/rebuild-workflow/references/dashboard-autorefresh.md` | 工作台层自动刷新规则（两层模型 / 观测字段 / 排查） |
 | `templates/project/project.json` | 各项目根状态源模板 |
 | `skills/rebuild-workflow/SKILL.md` | 总控层 |
 | `skills/rebuild-workflow/references/` | 横向能力层（stage-map / input-checklist / prior-art / rea-integration / engines / retro-checklist） |
@@ -185,6 +192,7 @@ flowchart LR
 
 ## 变更记录
 
+- 1.4.3（2026-11-09）工作台层加机器观测节点 B4 与定时重建节点 B5、回写连线；总控版本改 1.4.3；仓库结构表补自动刷新脚本与规则文档。
 - 1.4.2（2026-11-09）新增工作台层（project.json 状态源 / build_dashboard.py / 看板 HTML），分层图加节点与回写连线，仓库结构表同步；总控版本改 1.4.2。
 - 1.4.1（2026-11-09）入口加 A0 原包获取（本地包 / 游戏名 / Play 链接 / 三方链接），分层图、流程图、门禁表、仓库结构对应表同步。
 - 1.4.0（2026-11-09）新建：分层架构图、端到端流程与人机边界图、合规两线模型、外部能力接入位置、仓库结构对应；标注 2026-09 RescueBench 旧图为历史版本。

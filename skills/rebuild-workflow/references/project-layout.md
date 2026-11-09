@@ -1,6 +1,6 @@
 # 项目目录规范与看板状态源（project.json）
 
-> 适用：`apk-rebuild-skills` v1.4.2 起 ｜ 定位：**规则层**，不改变 A0 / S0–S7 八阶段、七条铁律、决策门 D1–D9、G-PUBLISH 发布门禁。
+> 适用：`apk-rebuild-skills` v1.4.2 起（v1.4.3 增加自动刷新与机器观测；见 `dashboard-autorefresh.md`） ｜ 定位：**规则层**，不改变 A0 / S0–S7 八阶段、七条铁律、决策门 D1–D9、G-PUBLISH 发布门禁。
 > 解决的问题：多个项目并行时，「进度、卡点、下一步」散落在 README 表格和各个 `启动提示词.md` 里，人要靠记忆找；AI 工具换一个会话就不知道该接着干什么。
 
 ---
@@ -166,6 +166,19 @@ python skills/rebuild-workflow/scripts/build_dashboard.py --root "<父目录>" -
 
 ---
 
+## 8. 机器观测层（v1.4.3，横切）
+
+看板每轮构建会额外扫描项目目录，产出 `dashboard/signals.json`：**最近文件活动**、**距上次回写后的文件变动数**、**观测到的阶段产物**、**卡点是否挂太久**。发现「登记状态与目录实际不一致」时，看板列出「🛰 机器观测 · 待核实」并给出一键复制的「核实提示词」。
+
+| 铁律 | 说明 |
+|---|---|
+| `project.json` 仍是唯一权威状态源 | 观测绝不自动改写它 |
+| 产物出现 != 阶段出口达标 | 机器只报事实，阶段前移由阶段 skill 的出口标准决定 |
+| 卡点不自动关闭 | 解除需人工/Agent 带依据确认 |
+| 不自动发布 | G-PUBLISH 仍由人逐产品执行 |
+
+扫描限时 6 秒 / 单项目 4000 文件，跳过 `.git` / `node_modules` / `extracted` 等大目录与看板自身文件；`truncated` 会标出触及预算的项目。定时重建与页面自刷新见 `dashboard-autorefresh.md`。
+
 ## 7. 与流程的关系
 
 | 项 | 是否改变 |
@@ -180,4 +193,5 @@ python skills/rebuild-workflow/scripts/build_dashboard.py --root "<父目录>" -
 
 ## 变更记录
 
+- 1.1（2026-11-09）v1.4.3 新增 §8 机器观测层与「旁证不改权威状态」铁律。
 - 1.0（2026-11-09）v1.4.2 新增：项目目录规范、`project.json` schema、状态回写强制规则、存量迁移映射、看板生成与检查。

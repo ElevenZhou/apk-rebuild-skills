@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.4.3 — 2026-11-09
+
+**看板自动刷新：不再依赖「AI 沟通一次 → 手动更新一次」**（用户要求：状态应动态自动更新，例如每 15 分钟一次）。定位为工作台层横切能力：**A0 + 八阶段 S0–S7、七条铁律、D1–D9、G-PUBLISH、输入检查表一律不变**。
+
+- **两层更新模型**：① 状态层 `collect_signals()` 扫描目录文件 mtime / 阶段产物 / 卡点登记后的变动，产出 `dashboard/signals.json` 与「🛰 机器观测 · 待核实」；② 呈现层定时重建 + 页面自动重载。明确「定时重画 != 状态自动变化」，只有观测层能让状态在无人对话时变化。
+- `build_dashboard.py` 新增 `--watch` / `--once` / `--interval` / `--refresh-sec` / `--no-signals` / `--quiet`；HTML、`signals.json` 均**原子写**，`watch.log` 保留 512KB 轮转并含每轮耗时；`--check` 行为不变。扫描限时 6 秒 / 单项目 4000 文件，跳过 `.git` / `node_modules` / `extracted` 与看板自身文件，7 个项目实测 0.06–0.31 秒。
+- 看板页面：每 15 分钟自动重载；显示数据时间、新鲜度（超 2 周期未更新标红「自动刷新可能已停止」）、倒计时、立即刷新；新增机器观测面板与统计「状态待核实」、卡片「⚠ 待核实」徽标、详情抽屉观测节、一键复制「核实提示词」。
+- 新增 `scripts/install_dashboard_task.ps1`：注册 / 查询 / 单次触发 / 卸载 Windows 计划任务 `RebuildDashboard-AutoRefresh`（每 15 分钟调 `--once`）；非 ASCII 路径存 `dashboard-task-config.json`（UTF-8），脚本本体保持 ASCII 以兼容系统内置 PS 5.1。
+- 新增 `references/dashboard-autorefresh.md`：两层模型、观测字段与提示规则、三种运行方式、计划任务命令、服务器 / 多人场景、排查清单、边界。`project-layout.md` 加 §8 机器观测层；`retro-checklist` 第 11 条补自动刷新检查；`README` 加自动刷新章节与常用说法；`ARCHITECTURE` 工作台层加定时 / 观测节点。
+- **铁律**：机器观测是旁证 —— 不自动改写 `project.json`、不判定阶段出口达标、不自动关闭卡点、不自动发布；「产物出现 != 阶段完成」，差异由人或 Agent 带依据回写。
+- **验证状态**：`py_compile` / `lint_skills.py` / 内联 JS `node --check` 通过；7/7 项目 schema 与目录检查 0 提示；headless Chrome 渲染复检通过；`--once` 静默链路实测 0.06 秒。**Windows 计划任务注册在本机会话被安全策略拦截（schtasks.exe 在黑名单）**，脚本与配置已就绪，需在有权限的终端里执行一次；未注册时可用 `--watch` 常驻替代，页面新鲜度告警会提示任务未生效。
+
 ## v1.4.2 — 2026-11-09
 
 **多项目看板 + 项目目录规范**（用户要求：多个项目并行时要能一眼看到进度与卡点、方便操作人员进去处理，并把项目文件夹结构规范化）。定位为横切能力：**A0 + 八阶段 S0–S7、七条铁律、D1–D9、G-PUBLISH、输入检查表一律不变**。
