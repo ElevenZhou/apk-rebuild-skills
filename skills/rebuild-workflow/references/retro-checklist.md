@@ -8,3 +8,13 @@
 6. **案例**：在仓库 `docs/cases/` 新增 `project-<代号>.md`（一页：背景、决策门结论、关键坑、交付物）。
 7. **提 PR**：分支 `retro/<项目代号>`，PR 描述附「项目 / 现象 / 验证方式」。
 8. 版本号：涉及的 skill 各自 bump（新增内容 = minor，修正 = patch），更新 CHANGELOG。
+9. **G-PUBLISH 复核**：确认交付物若对外发布，所有权已逐产品人工确认、发布由人工执行；未确认的是否已打 `仅内部` 标记且未对外分发。
+10. **发布同步（B4，必须逐项打勾）**：改完不是结束，要让四处 Agent 真正读到新版：
+    - [ ] `git commit` + 打 tag（如 `v1.4.0`），push 到 GitHub 私有仓库 `ElevenZhou/apk-rebuild-skills`
+    - [ ] 本机 clone `C:/Users/AprilWu/apk-rebuild-skills` 与 GitHub 一致（`git status` 干净）
+    - [ ] `Y:\Skills\apk-rebuild-skills` 共享副本按「clone 到 `.new` → 旧目录改名 `.bak-<日期>` → `.new` 改正式名」替换，**不在 Y 盘就地 git 操作**
+    - [ ] 四处安装点（WorkBuddy / Claude Code / Codex / Trae CN；OpenCode 读 Claude 目录）已更新；目录联接模式 `git pull` 即可，复制模式需重跑 `install.ps1`
+    - [ ] 新开会话自检：问「流程几阶段、D 门几个、发布前谁确认所有权」，答案与 SKILL.md 一致
+    - [ ] 其他工作区副本（如 `E:/Dev-2/.../通用工程/apk-rebuild-skills/`）已同步，避免副本滞后被误当权威源
+
+> 教训（2026-11-09）：通用工程内的开发期副本曾长期停在 v1.0.0，而正式版已是 v1.2.1，导致误判"回写链路断档"。**改之前先确认哪份是权威源，改之后按本清单同步。**

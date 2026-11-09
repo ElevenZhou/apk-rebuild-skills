@@ -1,7 +1,7 @@
 ---
 name: rebuild-asset-recovery
 description: 逆向重建 S3 资源回导：从自有安装包解包产物中恢复可编辑的美术/音频/字体/动画/文案资源，遵循"样品先行 → 批量 → 报告 → 原件不动"规则。内置 Godot 4.x 全套无 GDRE 依赖回导脚本（ctex→png、oggvorbisstr→ogg、fontdata→ttf、spatlas/spskel→Spine）；其他引擎给出通用流程与候选工具。由原 godot-asset-recovery 迁入。触发词：资源回导、提取素材、ctex、oggvorbisstr、spine 导出、恢复美术资源。
-version: 1.2.0
+version: 1.3.0
 owner: ElevenZhou
 ---
 
@@ -80,11 +80,13 @@ python scripts/rn/i18n_extract.py decompiled.js <out>/assets_imported/i18n en:<�
 - 样品验收表按类别全部有结论：PASS，或"raw 保存 + 说明"已经负责人认可；
 - 各类批量报告 SUMMARY 中 FAIL=0、PARTIAL 已登记，或失败项已登记且有降级方案；
 - 版权/再分发审查完成，可疑项已进待优化清单并有处理决定。
+- **注意**：本审查只管素材层面；作品整体的对外发布仍须过 S7 的 **G-PUBLISH 人工所有权确认**，可疑素材已清理不等于取得发布授权。
 
 ## 相关 skill
 上游 `rebuild-recon` → 下游 `rebuild-dev-milestones`（M0 骨架引用 assets_imported）、`rebuild-product-design`（换皮时决定哪些资源替换）。
 
 ## 变更记录
+- 1.3.0（2026-11-09）出口标准补注：素材版权审查不替代 S7 的 G-PUBLISH 人工所有权确认。
 - 1.2.0（2026-10-16）报告状态统一 OK/OK_RECOMP/PARTIAL/FAIL（PARTIAL 不计 PASS）；新增按类分评、i18n 入样品表、版权/再分发审查并写入出口；Unity AudioClip 用 clip.samples、FSB5 非加密（项目 C/F 复盘 C-6/C-7/C-8/F-7/F-8）。
 - 1.1.0（2026-10-02）新增 React Native/Expo + Hermes 小节与 scripts/rn（项目 C 实测）。
 - 1.0.0（2026-10-01）由 godot-asset-recovery 迁入并改名；脚本参数化；增加通用规则。

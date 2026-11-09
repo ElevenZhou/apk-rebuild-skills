@@ -1,5 +1,32 @@
 # Changelog
 
+## v1.4.0 — 2026-11-09
+
+**合规模型重构 + 现成成果能力接入 + 基线统一。** 来源：用户决定「允许所有作品进入流程，正式发布由人工逐产品确认所有权并人工操作」，以及 `outputs/开源项目落地评估与流程演进分析.md` 的 B0–B4 方案。
+
+- `rebuild-workflow` 1.4.0：合规模型改为**分析放行 / 发布管控**——允许公司自有 / 待确认 / 第三方 / 来源未知作品进入分析与重建；权属改为状态登记，不再阻断开工；新增 **G-PUBLISH 发布人工门禁**（逐产品人工确认所有权、人工执行发布、Agent 不得自动发布、未确认则 `仅内部`）；铁律扩为七条（先登记后动手、发布归人）；新增 **P0/P4 横切检查点**（不占 S 阶段编号）；S0/S7 出口、决策门、引擎适配同步；外部能力准入清单落地。
+- `rebuild-build-release` 1.2.0：新增 G-PUBLISH 门禁章节，区分内测包 / 正式发布包，交付物加 `INTERNAL-ONLY.md`，出口标准加发布授权；`references/delivery-checklist.md` 加「发布授权」小节（人工填写、Agent 不得代填）。
+- `rebuild-product-design` 1.3.0：新增 P4 参考实现检索与 `P4-参考实现清单.md`；D1 加 P0 `prior_art` 前置输入；D2/D5 适配新合规模型；补齐此前 1.2.0 未同步的 frontmatter 版本号。
+- `rebuild-recon` 1.3.0：作品准入放开；新增 `external-reference` 外部旁证等级（不得升级为 MV、不得关闭 P0）；09 篇加旁证列；补安全红线与工具地图指引；补齐 frontmatter 版本号。
+- `rebuild-asset-recovery` 1.3.0：出口标准补注「素材版权审查不替代 G-PUBLISH 人工所有权确认」。
+- 新增 `skills/rebuild-workflow/references/prior-art.md`：P0/P4 操作细则、三种检索接入方式、A/B/C 级外部能力准入清单、合规与安全边界。
+- `templates/project/scope.md`：权属四选一状态登记、新增 **发布授权（G-PUBLISH）**段与 **`prior_art` P0 检索表**、发布责任人、安全红线。
+- `references/input-checklist.md` 1.4.0：#2 由「权属确认、缺失不开工」改为「权属状态登记、不阻断开工」；新增 **#11 P0 现成成果检索**（必需，未命中也留痕）；新增 G-PUBLISH 发布门禁小节（硬门禁，不可放宽）。
+- `references/stage-map.md`：加入 P 横切层与 G-PUBLISH、门禁一览；S0 改名「立项登记」，产物表同步。
+- `references/rea-integration.md`：入口第 1 条改为所有作品可做分析取证、发布另过 G-PUBLISH；证据等级补 `external-reference`。
+- `references/retro-checklist.md`：新增第 9 条 G-PUBLISH 复核、第 10 条**发布同步检查**（GitHub tag → 本机 clone → Y 盘副本 → 四处安装点 → 其他工作区副本 → 新会话自检）。
+- `docs/SOP.md` **v1.4.0**：统一为**八阶段 S0–S7**（此前文档为七阶段、与 SKILL.md 不一致）；补合规模型、P 层、G-PUBLISH、检查表 #11 与发布门禁。
+- `README.md`：合规声明、架构总览（简版 Mermaid 图）、版本表、现成成果检索章节、使用说明（含第三方作品 / P0 / 发布门禁的常用说法）、Agent 停顿点、维护发布同步要求。
+- **新增 `docs/ARCHITECTURE.md`**：v1.4.0 分层架构图、端到端流程与人机边界图、合规两线模型、外部能力接入位置、仓库结构对应；明确 2026-09 RescueBench 的 S0–S9 旧图为历史版本，不作现行依据。
+- `skills/rebuild-device-evidence/SKILL.md` frontmatter 版本补齐为 1.2.0（REA 集成时变更记录已写 1.2.0、frontmatter 漏改）。
+- 工作区侧：根目录 `README.md`、`outputs/逆向成果检索清单.md`、`outputs/开源项目落地评估与流程演进分析.md` 同步；`通用工程/apk-rebuild-skills/` 开发期副本从 v1.0.0 同步到 v1.4.0（此前滞后，曾导致「回写断档」误判）。
+
+## v1.3.0 — 2026-10-17（补记，随 v1.4.0 一并发布）
+
+REA 联合模式（此前已在工作区改动但未提交、未写入 CHANGELOG）：
+- 新增 `skills/rebuild-workflow/references/rea-integration.md`：REA 与 `rebuild-*` 职责边界、Evidence 等级与归档、R1/R2/R3 路线判断、阶段映射、安全边界。
+- `rebuild-workflow` / `rebuild-recon` / `rebuild-product-design` / `rebuild-device-evidence`：接入 REA 静态与真机证据，D1/D2/D8 引用 Evidence，禁止把静态完整覆盖当成源码恢复。
+
 ## v1.2.1 — 2026-10-17
 - 安装脚本：修复以 `-File` 方式调用并传 `-Targets a,b,c` 时，多个目标被当成一个字符串、提示 unknown target 而什么都没装的问题（README 共享盘安装命令受影响）。
 

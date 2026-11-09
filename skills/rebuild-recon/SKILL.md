@@ -1,18 +1,21 @@
 ---
 name: rebuild-recon
-description: 逆向重建 S1 侦察解包 + S2 静态分析。对自有 APK/XAPK/EXE 做哈希基线、引擎/加固识别、解包、源码可恢复性结论，并产出 docs/01-09 九篇基线文档（带置信度标注）。单独使用场景：只想摸清一个自家安装包的结构、SDK、接口、存储和资源，不一定要重建。触发词：解包、APK 分析、引擎识别、逆向文档、九篇文档。
-version: 1.1.0
+description: 逆向重建 S1 侦察解包 + S2 静态分析。对任意作品（自有 / 待确认 / 第三方 / 未知）的 APK/XAPK/EXE 做哈希基线、引擎/加固识别、解包、源码可恢复性结论，并产出 docs/01-09 九篇基线文档（带置信度标注）。单独使用场景：只想摸清一个安装包的结构、SDK、接口、存储和资源，不一定要重建。触发词：解包、APK 分析、引擎识别、逆向文档、九篇文档。
+version: 1.3.0
 owner: ElevenZhou
 ---
 
-# rebuild-recon — 侦察解包与静态分析
+# rebuild-recon — 侦察解包与静态分析（REA 联合模式）
+
+> 需要 Android 方法、调用引用、接口注解或存储证据时，读取上游 [rebuild-workflow/references/rea-integration.md](../rebuild-workflow/references/rea-integration.md)，用 REA 补强 JADX/Apktool 的结果。
+> 工具选型可查 [prior-art.md](../rebuild-workflow/references/prior-art.md) 的「Language runtimes and packagers」节。
 
 ## 何时用 / 何时不用
-- **用**：已有 scope.md 授权的自有安装包，需要了解其引擎、结构、SDK、接口、资源。
-- **不用**：没有权属确认（先走 `rebuild-workflow` S0）；只想导出资源（直接 `rebuild-asset-recovery`）。
+- **用**：已在 `scope.md` 登记权属状态并勾选分析范围的**任意作品**安装包，需要了解其引擎、结构、SDK、接口、资源。v1.4.0 起权属待确认 / 第三方 / 来源未知均不阻断。
+- **不用**：只想导出资源（直接 `rebuild-asset-recovery`）；未建 `scope.md` 或分析范围未勾选（先走 `rebuild-workflow` S0）。
 
 ## 需要的输入
-- 原包文件（APK/XAPK/AAB/EXE）、scope.md（单独使用时至少有一句权属确认）。
+- 原包文件（APK/XAPK/AAB/EXE）、scope.md（含权属状态登记与授权范围逐项勾选）。
 - 工具：`unzip`、`sha256sum`；按引擎：apktool + jadx（原生 / 通用 manifest）、GDRE Tools（Godot）、AssetRipper/Il2CppDumper（Unity）、hermes-dec（React Native + Hermes，见 `engines/react-native-hermes.md`）。
 - 环境前置（见 `rebuild-workflow/references/input-checklist.md`）：ASCII 工作路径、JAVA_HOME 不含中文、java 可显式调用。
 
@@ -26,7 +29,13 @@ owner: ElevenZhou
 4. **资源清单**：`python scripts/asset_manifest.py extracted/ > assets/manifest.json`（按扩展名计数 + 体积，含全部分包）。
 5. **源码可恢复性结论**（写入 scope.md 与 docs/09）：逐项判断 ① 逻辑层可读程度（明文/字节码可反编译/加密/native）② 资源可导出程度 ③ 是否有加固 ④ 服务端依赖。结论给出 R1 近似源码恢复 / R2 契约+重写 / R3 仅资源复用 之一，交 `rebuild-workflow` S1 决策门。
 
+6. **REA Android 证据**：对 Android APK 按需执行 `inspect_android_package → search_android_classes → inspect_android_class → inspect_android_method → trace_android_references`。优先覆盖启动入口、核心页面、ViewModel/Controller、API interface、HTTP client、存储和安全边界。保存原始 Evidence JSON、Evidence ID、artifact SHA-256、provider 版本和 coverage；方法级证据不足时登记 unknown。
+
+7. **证据归档**：将 REA 结果与 `extracted/`、`recon/` 和 docs/03/04/07/09 交叉索引。REA 反编译源码只作为观察证据；不得宣称恢复原始工程、服务端或完整动态行为。
+
 S1 出口：引擎类型（附日志证据）、加固结论、资源总量清单（含全部分包）、源码可恢复性结论。
+
+S1/S2 联合出口增加：REA provider 可复现；关键类/方法和接口 Evidence 已归档；静态 coverage/unknown 已登记；R1/R2/R3 建议已写入 scope.md 和 docs/09。
 
 ## S2 九篇文档（固定编号与命名）
 
@@ -40,16 +49,18 @@ S1 出口：引擎类型（附日志证据）、加固结论、资源总量清�
 | docs/06-异常与容错.md | 断网/存档损坏/广告失败降级 | 代码、实测 |
 | docs/07-安全逻辑.md | 加密、校验、cheat/debug 面（重建时剔除） | 代码 |
 | docs/08-资源清单.md | manifest 详表 | manifest.json |
-| docs/09-人工复核清单.md | 所有不确定项，每项 P0/P1/P2 | 汇总前 8 篇 |
+| docs/09-人工复核清单.md | 所有不确定项，每项 P0/P1/P2，含外部旁证列 | 汇总前 8 篇 |
 
 模板：`references/doc-templates.md`。
 
 ### 写作规则
-- **每个结论带置信度**：`machine-verified`（工具输出可复现）/ `human-reviewed`（人对过录屏或实机）/ `human-reported`（口述待验证）。
+- **每个结论带置信度**：`machine-verified`（工具输出可复现）/ `human-reviewed`（人对过录屏或实机）/ `human-reported`（口述待验证）/ `inferred`（推断，必须进 09）。
+- **`external-reference`（外部旁证）**：P0/P4 检索到的现成实现、同类格式解析器、开源玩法范式，只在 09 的旁证列或正文备注里引用。**不得升级为 machine-verified，不得用来关闭 P0 占位**，也不能替代对本项目原包的实测。
 - 拿不准的数值写 `P0 占位`，进 09 篇，**禁止编造**。
 - 涉及商业判断（是否在架、竞品）必须联网核实并附链接和日期。
 - 密钥/token 类发现只记录"存在 + 位置"，**不把值写进文档**。
 - 项目已有更严格的文档门禁时，以严者为准。
+- 分析第三方产品时同样遵守安全红线（见 `rea-integration.md`）：不绕过登录/风控/证书校验，不复用其生产服务，不公开发布反编译产物。
 
 S2 出口：九篇齐全；09 篇里每个 P0 都标了计划在哪个里程碑关闭；负责人看过 01 与 09。
 
@@ -64,6 +75,8 @@ S2 出口：九篇齐全；09 篇里每个 P0 都标了计划在哪个里程碑�
 上游 `rebuild-workflow`（S0）→ 下游 `rebuild-asset-recovery`（S3）、`rebuild-product-design`（S4 使用九篇文档）。
 
 ## 变更记录
+- 1.3.0（2026-11-09）作品准入放开到所有作品；新增 `external-reference` 外部旁证等级与使用边界；09 篇加旁证列；补安全红线与工具地图指引；补齐此前 1.2.0 REA 集成未同步的 frontmatter 版本号。
+- 1.2.0（2026-10-17）接入 REA Android/JADX 方法级证据和 Evidence 归档；补充静态 coverage/unknown 与 R1/R2/R3 联合出口。
 - 1.1.0（2026-10-16）哈希统一 sha256sum；强制解全部分包；新增步骤 5 源码可恢复性结论并写入 S1 出口；补 apktool 无 java 卡死、RN 大包慢两条坑（项目 C/F 复盘 C-4/C-9/F-2/F-4）。
 - 1.0.1（2026-10-02）detect_engine.py 识别 Hermes 字节码版本、Expo 配置与 XAPK 分包（项目 C）。
 - 1.0.0（2026-10-01）项目 D 提炼。

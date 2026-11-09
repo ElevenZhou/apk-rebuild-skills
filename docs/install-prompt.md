@@ -28,6 +28,8 @@
       rebuild-workflow / rebuild-recon / rebuild-asset-recovery / rebuild-product-design /
       rebuild-dev-milestones / rebuild-device-evidence / rebuild-build-release
    b. 路由自测（只回答会调用哪个技能，不要真正执行）：
+      “发布前要人工确认什么” → rebuild-build-release（G-PUBLISH 人工所有权确认）
+      “查一下有没有现成的开源实现” → rebuild-workflow（P0 现成成果检索）
       “源码丢了只剩 APK，帮我重建这个项目” → rebuild-workflow
       “分析一下这个 apk 是什么引擎” → rebuild-recon
       “把包里的图片音频导出来” → rebuild-asset-recovery
