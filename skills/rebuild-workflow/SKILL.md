@@ -1,7 +1,7 @@
 ---
 name: rebuild-workflow
-description: 任意作品（自有 / 第三方 / 权属待确认）的“安装包 → REA 逆向取证 → 重建 → 再开发 → 交付工程+试玩包”全流程总控。接手只有安装包、需要方法级静态分析、真机采证和可维护新工程的任务时使用；负责权属登记、阶段、决策门、出口标准和发布门禁，并调度 rebuild-* 与 REA。正式发布前必须逐产品人工确认所有权，由人工执行发布，Agent 不得自动发布。输入可为本地 APK / 游戏名 / Google Play 链接 / 三方市场链接，A0 负责获取原包。
-version: 1.4.1
+description: 任意作品（自有 / 第三方 / 权属待确认）的“安装包 → REA 逆向取证 → 重建 → 再开发 → 交付工程+试玩包”全流程总控。接手只有安装包、需要方法级静态分析、真机采证和可维护新工程的任务时使用；负责权属登记、阶段、决策门、出口标准和发布门禁，并调度 rebuild-* 与 REA。正式发布前必须逐产品人工确认所有权，由人工执行发布，Agent 不得自动发布。输入可为本地 APK / 游戏名 / Google Play 链接 / 三方市场链接，A0 负责获取原包；多项目并行时按 project-layout.md 回写各项目 project.json 供看板聚合。
+version: 1.4.2
 owner: ElevenZhou
 ---
 
@@ -9,6 +9,7 @@ owner: ElevenZhou
 
 > REA 集成规则见 [references/rea-integration.md](references/rea-integration.md)。REA 负责逆向证据，本文负责权属登记、决策、重建、交付和发布门禁。
 > 现成成果与工具检索见 [references/prior-art.md](references/prior-art.md)。
+> 项目目录规范与看板状态源见 [references/project-layout.md](references/project-layout.md)。
 
 ## 合规模型（v1.4.0 起，必读）
 
@@ -29,6 +30,26 @@ owner: ElevenZhou
 
 - **用**：任意作品，只剩 APK/XAPK/EXE，需要分析结构、重建成可维护新工程，并最终交付「工程源码 + 试玩 APK」；或只需竞品研究抽象 / 取证。
 - **不用**：只需改一个资源/文案的小修补 → 用 `rebuild-asset-recovery`；只需打包 → 用 `rebuild-build-release`。
+
+## 看板与状态回写（多项目并行，v1.4.2 起）
+
+多个项目并行时，进度与卡点**不靠记忆、不靠会话上下文**。每个项目根目录放一份 `project.json` 作为看板唯一状态源，规则见 [references/project-layout.md](references/project-layout.md)，模板 `templates/project/project.json`。
+
+| 时机 | 必须回写 |
+|---|---|
+| A0 完成 / S0 立项 | `stage`、`completed`、`ownership`、`publish_gate`、`summary` |
+| 任一阶段出口通过 | `completed` 追加该阶段、`stage` 前移、`progress` |
+| 出现或解除卡点 | `blockers[]`、`status`、`next_action` |
+| **每次会话结束前** | 至少 `updated_at`、`next_action`、`blockers[]`，并说明本次改了什么 |
+
+卡点必须写全「卡在哪 / 等谁 / 要做什么」；**卡住就标 `blocked`，不要为了好看写 `active`**。超过 7 天未回写，看板标「数据可能过时」。
+
+```bash
+python scripts/build_dashboard.py --root "<项目父目录>" --out "<父目录>/通用工程/dashboard/index.html"
+python scripts/build_dashboard.py --root "<项目父目录>" --check
+```
+
+看板**只反映状态**：不判定阶段是否达标、不替代出口标准、不自动关闭卡点、不自动发布；G-PUBLISH 仍由人执行。本层不占 S 阶段编号，不改七条铁律、D1–D9 与输入检查表。
 
 ## A0 原包获取（流程第一步，不占 S 阶段编号）
 
@@ -155,6 +176,7 @@ P 层用到的外部能力（按 `prior-art.md` 的准入清单）：
 `rebuild-recon` · `rebuild-asset-recovery` · `rebuild-product-design` · `rebuild-dev-milestones` · `rebuild-device-evidence` · `rebuild-build-release`
 
 ## 变更记录
+- 1.4.2（2026-11-09）新增**看板与状态回写**：项目目录规范 `project-layout.md`、`project.json` 模板、离线看板生成器 `build_dashboard.py`；新增状态回写时机与卡点登记要求（横切层，不改阶段编号与门禁）。
 - 1.4.1（2026-11-09）新增 **A0 原包获取**：本地包直接进 S0；游戏名 / Google Play 链接 / 三方市场链接由 `fetch_artifact.py` 下载并留痕；新增 `artifact-acquisition.md`；不改八阶段编号、铁律、门禁。
 - 1.4.0（2026-11-09）合规模型改为「分析放行 / 发布管控」：允许所有作品进入流程，权属改为状态登记；新增 **G-PUBLISH 发布人工门禁**（逐产品人工确认所有权、人工发布）；新增 P0/P4 横切检查点与 `prior-art.md` 外部能力清单；铁律扩为七条；置信度体系加 external-reference 旁证；S0/S7 出口同步。
 - 1.3.0（2026-10-17）新增 REA 联合模式：统一逆向证据、Evidence 归档、ADB 真机证据、R1/R2/R3 决策和第三方 APK 权属边界；详见 `references/rea-integration.md`。

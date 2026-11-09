@@ -17,4 +17,6 @@
     - [ ] 新开会话自检：问「流程几阶段、D 门几个、发布前谁确认所有权」，答案与 SKILL.md 一致
     - [ ] 其他工作区副本（如 `E:/Dev-2/.../通用工程/apk-rebuild-skills/`）已同步，避免副本滞后被误当权威源
 
+11. **看板状态回写（v1.4.2）**：确认项目根 `project.json` 已更新到最终状态（`stage / completed / progress / blockers / next_action / updated_at / publish_gate`），卡点已清空或写明等谁处理；重新生成 `dashboard/index.html` 并核对卡片；`build_dashboard.py --check` 无 schema 错误。规则见 `references/project-layout.md`。
+
 > 教训（2026-11-09）：通用工程内的开发期副本曾长期停在 v1.0.0，而正式版已是 v1.2.1，导致误判"回写链路断档"。**改之前先确认哪份是权威源，改之后按本清单同步。**

@@ -1,0 +1,29 @@
+{
+  "schema_version": "1.0",
+  "_help": "看板状态源。字段说明见 skills/rebuild-workflow/references/project-layout.md；每次推进项目后必须回写。复制到 <项目根>/project.json 后删除本行。",
+  "id": "X",
+  "name": "项目X",
+  "product": "<产品名 / 新品牌名>",
+  "package": "com.example.app",
+  "engine": "待定",
+  "track": "rebuild",
+  "status": "not-started",
+  "stage": "S0",
+  "completed": ["A0"],
+  "progress": 0,
+  "milestone": "",
+  "owner": "<决策负责人>",
+  "operator": "<执行人 / AI 工具>",
+  "updated_at": "2026-11-09",
+  "ownership": "权属待确认",
+  "publish_gate": "not-applicable",
+  "summary": "一句话现状",
+  "next_action": "S0 立项登记：登记权属状态、逐项勾选分析范围、跑 P0 现成成果检索",
+  "blockers": [],
+  "key_files": [
+    { "label": "断点简报", "path": "README.md" },
+    { "label": "授权与范围", "path": "scope.md" }
+  ],
+  "links": {},
+  "data_source": "新建项目模板，待补真实信息"
+}

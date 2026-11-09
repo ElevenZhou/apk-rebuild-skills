@@ -1,6 +1,6 @@
-# 架构图（v1.4.0）
+# 架构图（v1.4.2）
 
-> 日期：2026-11-09 ｜ 适用：`apk-rebuild-skills` v1.4.1 ｜ 配套：[SOP.md](SOP.md)、`skills/rebuild-workflow/references/stage-map.md`
+> 日期：2026-11-09 ｜ 适用：`apk-rebuild-skills` v1.4.2 ｜ 配套：[SOP.md](SOP.md)、`skills/rebuild-workflow/references/stage-map.md`
 >
 > 历史版本：2026-09 的 RescueBench 分层架构图 / S0–S9 流程图已归档，仅代表当时的设计，**不作为现行架构依据**（见文末「历史设计包」）。
 
@@ -15,7 +15,7 @@ flowchart TB
         U4["Trae CN"]
     end
 
-    subgraph CTL["总控层 · rebuild-workflow 1.4.0（唯一自建编排资产）"]
+    subgraph CTL["总控层 · rebuild-workflow 1.4.2（唯一自建编排资产）"]
         C0["A0 原包获取（流程第一步）<br/>有包就进 / 没包才下"]
         C1["合规模型：分析放行 / 发布管控"]
         C2["八阶段 S0–S7 + 出口标准 + 七条铁律"]
@@ -47,6 +47,12 @@ flowchart TB
         T4["Godot / Unity / JDK17 / Android build-tools"]
     end
 
+    subgraph BOARD["工作台层 · 多项目并行（v1.4.2 横切，不改阶段编号）"]
+        B1["各项目根 project.json<br/>状态 / 进度 / 卡点 / 下一步"]
+        B2["build_dashboard.py 聚合 + 规范检查"]
+        B3["dashboard/index.html<br/>卡点置顶 · 一键复制处理提示词"]
+    end
+
     subgraph OUT["产出层"]
         O1["docs 01-09 基线文档 + 证据链"]
         O2["可维护新工程源码 + cfg 校准值"]
@@ -55,6 +61,9 @@ flowchart TB
     end
 
     C0 --> C1
+    CTL -. 阶段结束回写状态 .-> B1
+    B1 --> B2 --> B3
+    B3 -. 人工接手项目 .-> U1
     U1 --> CTL
     U2 --> CTL
     U3 --> CTL
@@ -71,6 +80,7 @@ flowchart TB
 
 **关键说明**
 
+- **工作台层是横切观察者**：只读各项目 `project.json` 生成看板，不判定出口标准、不改阶段编号、不自动关闭卡点、不自动发布；人从看板点「处理提示词」把项目交回 Agent。
 - **编排层是唯一自建资产**：工具层坏了换工具、模型层换了换 API 配置，总控与阶段 skill 的出口标准不变。
 - **横向能力层按需加载**：`references/` 与 `engines/` 由总控按阶段注入上下文，不一次塞满。
 - **A0 在流程最前**：本地包直接进 S0，否则由 `fetch_artifact.py` 按游戏名 / Play 链接 / 三方链接下载；它是输入 #1 的前置动作，不占 S 编号，也不改门禁结构。
@@ -153,6 +163,9 @@ flowchart LR
 | 路径 | 对应层 |
 |---|---|
 | `skills/rebuild-workflow/scripts/fetch_artifact.py` | A0 原包获取脚本（四种输入，参数化） |
+| `skills/rebuild-workflow/references/project-layout.md` | 工作台层规则（目录规范 / project.json schema / 状态回写） |
+| `skills/rebuild-workflow/scripts/build_dashboard.py` | 工作台层生成器（离线 HTML 看板 + `--check`） |
+| `templates/project/project.json` | 各项目根状态源模板 |
 | `skills/rebuild-workflow/SKILL.md` | 总控层 |
 | `skills/rebuild-workflow/references/` | 横向能力层（stage-map / input-checklist / prior-art / rea-integration / engines / retro-checklist） |
 | `skills/rebuild-*/SKILL.md` | 阶段技能层（recon / asset-recovery / product-design / dev-milestones / device-evidence / build-release） |
@@ -172,5 +185,6 @@ flowchart LR
 
 ## 变更记录
 
+- 1.4.2（2026-11-09）新增工作台层（project.json 状态源 / build_dashboard.py / 看板 HTML），分层图加节点与回写连线，仓库结构表同步；总控版本改 1.4.2。
 - 1.4.1（2026-11-09）入口加 A0 原包获取（本地包 / 游戏名 / Play 链接 / 三方链接），分层图、流程图、门禁表、仓库结构对应表同步。
 - 1.4.0（2026-11-09）新建：分层架构图、端到端流程与人机边界图、合规两线模型、外部能力接入位置、仓库结构对应；标注 2026-09 RescueBench 旧图为历史版本。

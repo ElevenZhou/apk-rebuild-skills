@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.4.2 — 2026-11-09
+
+**多项目看板 + 项目目录规范**（用户要求：多个项目并行时要能一眼看到进度与卡点、方便操作人员进去处理，并把项目文件夹结构规范化）。定位为横切能力：**A0 + 八阶段 S0–S7、七条铁律、D1–D9、G-PUBLISH、输入检查表一律不变**。
+
+- 新增 `templates/project/project.json`：**看板唯一状态源** schema v1.0（标识 / 状态 / 行动三组字段）。`status`、`track`、`ownership`、`publish_gate`、`severity` 均为受控枚举；`blockers[]` 强制写全「卡在哪 / 等谁 / 要做什么」。
+- 新增 `skills/rebuild-workflow/references/project-layout.md`：标准目录树（`input / docs / recon / extracted / semantics / evidence / assets / rebuild / release / runs / report / notes / blockers`）、命名规则、**状态回写强制时机表**、存量项目渐进迁移映射（不搬 812MB 级文件）、看板生成与 `--check` 用法、与流程的边界。
+- 新增 `skills/rebuild-workflow/scripts/build_dashboard.py`：零第三方依赖，扫描 `<root>/项目*/project.json`，做 schema / 枚举 / 卡点 / 目录 / 数据新鲜度检查，生成**数据内嵌的离线单页 HTML**（双击即开、无需服务）。看板含统计、卡点置顶「需要你处理」、九阶段进度条、筛选搜索、详情抽屉、**一键复制处理提示词 / 项目路径 / 打开目录**。
+- `rebuild-workflow` **1.4.2**：新增「看板与状态回写」章节与总控引用；`retro-checklist.md` 加第 11 条收尾回写检查；`README.md` 加看板章节、常用说法、版本表与仓库结构；`docs/ARCHITECTURE.md` 加「工作台层」节点与连线、版本与仓库结构表同步。
+- 工作区侧：为 A–G 七个项目各建 `project.json`（阶段、进度、卡点、下一步均从既有 README / 待优化清单 / scope / 进展记录提取，**标注 data_source 与待核对项**），A/B/E 补 `README.md` 断点简报；新增父级 `项目目录规范.md`；生成 `通用工程/dashboard/index.html`。
+- **验证状态**：`py_compile` 通过、`--check` 7/7 项目 schema 与目录检查通过（0 条提示）、生成器输出 7 项目 / 1 阻塞 / 5 待人工；HTML 内嵌 JSON 可解析、无占位符残留、内联 JS `node --check` 通过。`project.json` 中的进度为文档整理值，需负责人核对后作为基线。
+
 ## v1.4.1 — 2026-11-09
 
 **A0 原包获取：把「第一步」固化下来**（用户要求：从指定来源下载 APK；已提供 APK 就直接进流程；输入可为游戏名 / Google Play 链接 / 三方市场链接）。定位为补丁版：**八阶段 S0–S7、七条铁律、决策门 D1–D9、G-PUBLISH 一律不变**。
