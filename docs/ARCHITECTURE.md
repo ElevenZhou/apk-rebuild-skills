@@ -1,6 +1,6 @@
 # 架构图（v1.4.0）
 
-> 日期：2026-11-09 ｜ 适用：`apk-rebuild-skills` v1.4.0 ｜ 配套：[SOP.md](SOP.md)、`skills/rebuild-workflow/references/stage-map.md`
+> 日期：2026-11-09 ｜ 适用：`apk-rebuild-skills` v1.4.1 ｜ 配套：[SOP.md](SOP.md)、`skills/rebuild-workflow/references/stage-map.md`
 >
 > 历史版本：2026-09 的 RescueBench 分层架构图 / S0–S9 流程图已归档，仅代表当时的设计，**不作为现行架构依据**（见文末「历史设计包」）。
 
@@ -16,6 +16,7 @@ flowchart TB
     end
 
     subgraph CTL["总控层 · rebuild-workflow 1.4.0（唯一自建编排资产）"]
+        C0["A0 原包获取（流程第一步）<br/>有包就进 / 没包才下"]
         C1["合规模型：分析放行 / 发布管控"]
         C2["八阶段 S0–S7 + 出口标准 + 七条铁律"]
         C3["决策门 D1–D9（负责人拍板）"]
@@ -53,6 +54,7 @@ flowchart TB
         O4["INTERNAL-ONLY.md（未过 G-PUBLISH 时）"]
     end
 
+    C0 --> C1
     U1 --> CTL
     U2 --> CTL
     U3 --> CTL
@@ -71,6 +73,7 @@ flowchart TB
 
 - **编排层是唯一自建资产**：工具层坏了换工具、模型层换了换 API 配置，总控与阶段 skill 的出口标准不变。
 - **横向能力层按需加载**：`references/` 与 `engines/` 由总控按阶段注入上下文，不一次塞满。
+- **A0 在流程最前**：本地包直接进 S0，否则由 `fetch_artifact.py` 按游戏名 / Play 链接 / 三方链接下载；它是输入 #1 的前置动作，不占 S 编号，也不改门禁结构。
 - **安装方式**：`install/install.ps1` 把 `skills/*` 目录联接到四处 Agent 的 skills 目录；Y 盘共享副本因 NAS 限制走复制模式。
 - **改动生效链路**：本机 clone → commit + tag → push GitHub → Y 盘共享副本 → 四处安装点 → 其他工作区副本 → 新会话自检（见 `retro-checklist.md` 第 10 条）。只改本地副本不生效。
 
@@ -78,7 +81,10 @@ flowchart TB
 
 ```mermaid
 flowchart LR
-    IN["任意作品<br/>自有 / 待确认 / 第三方 / 未知"] --> S0["S0 立项登记<br/>权属状态登记 + 分析范围逐项勾选"]
+    IN["输入<br/>本地 APK / 游戏名 / Play 链接 / 三方市场链接"] --> A0{"A0 原包获取<br/>有包就进 / 没包才下"}
+    A0 -- "已提供本地包" --> S0["S0 立项登记<br/>权属状态登记 + 分析范围逐项勾选"]
+    A0 -- "需下载" --> DL["公开镜像下载 + 校验 sha256<br/>artifact-source.json 留痕"]
+    DL --> S0
     S0 --> P0{"P0 现成成果检索<br/>S0→S1 门口 · 必做"}
     P0 --> S1["S1 侦察解包<br/>哈希 / 引擎 / 可恢复性结论"]
     S1 --> S2["S2 静态分析<br/>docs 01-09 + Evidence"]
@@ -111,6 +117,7 @@ flowchart LR
 
 | 位置 | 门禁 | 谁确认 |
 |---|---|---|
+| **A0** | 游戏名多候选 / 包名版本不符 / 来源可疑 → 人工确认 | 负责人 |
 | S0 结束 | scope.md（权属状态 + 授权范围 + P0 结论） | 负责人 |
 | S1 结束 | 源码可恢复性结论（R1/R2/R3） | 负责人 |
 | S2 结束 | docs/01 + docs/09 | 负责人 |
@@ -145,6 +152,7 @@ flowchart LR
 
 | 路径 | 对应层 |
 |---|---|
+| `skills/rebuild-workflow/scripts/fetch_artifact.py` | A0 原包获取脚本（四种输入，参数化） |
 | `skills/rebuild-workflow/SKILL.md` | 总控层 |
 | `skills/rebuild-workflow/references/` | 横向能力层（stage-map / input-checklist / prior-art / rea-integration / engines / retro-checklist） |
 | `skills/rebuild-*/SKILL.md` | 阶段技能层（recon / asset-recovery / product-design / dev-milestones / device-evidence / build-release） |
@@ -164,4 +172,5 @@ flowchart LR
 
 ## 变更记录
 
+- 1.4.1（2026-11-09）入口加 A0 原包获取（本地包 / 游戏名 / Play 链接 / 三方链接），分层图、流程图、门禁表、仓库结构对应表同步。
 - 1.4.0（2026-11-09）新建：分层架构图、端到端流程与人机边界图、合规两线模型、外部能力接入位置、仓库结构对应；标注 2026-09 RescueBench 旧图为历史版本。

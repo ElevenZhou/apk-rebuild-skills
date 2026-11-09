@@ -2,7 +2,7 @@
 
 公司内部用的 **AI Agent Skill 包**：把「安装包 → 逆向取证 → 重建 → 再开发 → 交付工程 + 试玩 APK」整套流程固化下来。目标是让任何同事接手这类项目时都按同一套流程、同一套出口标准走，不依赖个人经验。
 
-适用于 WorkBuddy / CodeBuddy / Claude Code / Codex / Trae CN / OpenCode 等支持 `SKILL.md` 的 Agent 工具。当前版本见 [CHANGELOG.md](CHANGELOG.md)（**v1.4.0**）。
+适用于 WorkBuddy / CodeBuddy / Claude Code / Codex / Trae CN / OpenCode 等支持 `SKILL.md` 的 Agent 工具。当前版本见 [CHANGELOG.md](CHANGELOG.md)（**v1.4.1**）。
 
 > ## ⚠️ 合规模型（v1.4.0 起）
 >
@@ -12,13 +12,34 @@
 >
 > 判断口诀：**能不能分析 ≠ 能不能发布**。分析范围仍逐项勾选，没勾 = 不做；全程禁止绕过登录/风控/证书校验、不复用第三方生产服务、不公开发布反编译产物。
 
-## 架构总览（v1.4.0）
+## 第一步：获取原包（A0，不占阶段编号）
 
-完整架构图（分层架构、端到端流程与人机边界、合规两线、外部能力接入位置）见 **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**；阶段级细节见 `skills/rebuild-workflow/references/stage-map.md`。
+**有包就进，没包才下。** 用户给下面任意一种就能开工，A0 的产出是原包 + `sha256` + 来源留痕：
+
+| 用户给的 | 例子 | 动作 |
+|---|---|---|
+| 本地 APK / XAPK / EXE | `D:/apk/foo.xapk` | **不下载**，校验 + 归档 + 登记 → 直接进 S0 |
+| 游戏名 | `Mochichat` | 搜候选包名 → **人工确认是哪款** → 下载 |
+| Google Play 链接 | `play.google.com/store/apps/details?id=com.foo.game` | 取 `?id=` 包名 → 公开镜像下载（Play 不给 APK 直链） |
+| 三方市场链接 | APKPure / APKCombo / APKMirror 下载页或直链 | 直接下载 |
+
+```bash
+python skills/rebuild-workflow/scripts/fetch_artifact.py --from-file "D:/apk/foo.xapk" --out "项目X/input"
+python skills/rebuild-workflow/scripts/fetch_artifact.py --play-url "<Play 链接>" --out "项目X/input"
+# 另有 --name（配 --pick N）/ --market-url；--proxy / --chrome 可选
+```
+
+细则见 `skills/rebuild-workflow/references/artifact-acquisition.md`。**同名游戏候选、包名版本不符、来源可疑时必须由负责人确认**；付费 / 登录 / 区域受限应用由负责人提供已合法取得的包体，脚本不绕过反爬、验证码或会员墙。留痕文件 `input/artifact-source.json` 要写进 `scope.md`。
+
+## 架构总览（v1.4.1）
+
+完整架构图（分层架构、端到端流程与人机边界、合规两线、外部能力接入位置）见 **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**；阶段级细节见 `skills/rebuild-workflow/references/stage-map.md`；原包获取见 `artifact-acquisition.md`。
 
 ```mermaid
 flowchart LR
-    AGENT["Agent 工具<br/>WorkBuddy / Claude Code / Codex / Trae CN"] --> WF["总控 rebuild-workflow<br/>合规模型 + S0–S7 + D1–D9 + 铁律"]
+    IN["输入：本地 APK / 游戏名 / Play 链接 / 三方链接"] --> A0{"A0 原包获取<br/>有包就进 / 没包才下"}
+    A0 --> WF["总控 rebuild-workflow<br/>合规模型 + S0–S7 + D1–D9 + 铁律"]
+    AGENT["Agent 工具<br/>WorkBuddy / Claude Code / Codex / Trae CN"] --> WF
     WF --> SKILLS["阶段技能 rebuild-*<br/>S1–S7"]
     P["P0 / P4 横切层<br/>现成成果检索"] -.-> WF
     REA["REA / 引擎专节 / 外部索引"] -.-> SKILLS
@@ -33,7 +54,7 @@ flowchart LR
 
 | Skill | 版本 | 阶段 | 一句话 | 可单独使用 |
 |---|---|---|---|---|
-| `rebuild-workflow` | 1.4.0 | 总控 S0–S7 | 合规模型、P0/P4 检查点、输入检查表、决策门、出口标准、发布门禁、复盘回写 | 入口 |
+| `rebuild-workflow` | 1.4.1 | 总控 A0 + S0–S7 | **A0 原包获取**、合规模型、P0/P4 检查点、输入检查表、决策门、出口标准、发布门禁、复盘回写 | 入口 |
 | `rebuild-recon` | 1.3.0 | S1–S2 | 解包、引擎识别、REA 方法级证据、docs/01-09 九篇文档 | ✅ 只做分析 |
 | `rebuild-asset-recovery` | 1.3.0 | S3 | 资源回导（Godot 全套脚本 + RN 资源/i18n 脚本）、版权审查 | ✅ 只提资源 |
 | `rebuild-product-design` | 1.3.0 | S4 | P4 参考实现、产品文档、决策门 D1-D9、品牌、微创新、开发计划 | ✅ 规划新版本 |
@@ -108,6 +129,7 @@ powershell -ExecutionPolicy Bypass -File Y:\Skills\apk-rebuild-skills\install\in
 | 真机采证 | adb（platform-tools）、`pip install pillow numpy opencv-python` |
 | 视觉读图 | 环境变量 `VISION_API_KEY`（可选 `VISION_API_URL`、`VISION_MODEL`） |
 | 打包 | JDK 17/21、Android build-tools ≥35、导出模板 |
+| A0 下载（按需） | Python 3.10+、`pip install playwright`、本机 Chrome 或 Playwright chromium；代理用 `--proxy` / `HTTPS_PROXY` |
 
 **所有工具链放纯英文路径**（如 `C:/android-sdk`），中文路径会导致多个工具静默失败。
 
@@ -130,6 +152,8 @@ powershell -ExecutionPolicy Bypass -File Y:\Skills\apk-rebuild-skills\install\in
 
 | 想做的事 | 对 Agent 说 |
 |---|---|
+| 只有游戏名 / 商店链接 | 用 rebuild-workflow 走 A0，从 `<名字 / Play 链接 / 三方市场链接>` 下载原包，校验 sha256 后立项 |
+| 已经有 APK | 用 rebuild-workflow 从 `<本地路径>` 开始，跳过下载直接立项 |
 | 新项目完整流程 | 用 rebuild-workflow 开一个重建项目，原包在 `D:/work/项目E/xxx.xapk`，负责人是张三 |
 | 第三方 / 权属待确认的作品 | 用 rebuild-workflow 分析 `D:/apk/foo.apk`，权属状态登记为"待确认"，先只做静态分析 |
 | 只分析安装包 | 用 rebuild-recon 分析 `D:/apk/foo.apk`，识别引擎，给出源码可恢复性结论 |
@@ -142,6 +166,7 @@ powershell -ExecutionPolicy Bypass -File Y:\Skills\apk-rebuild-skills\install\in
 | 走发布门禁 | 用 rebuild-build-release 过一遍 G-PUBLISH，列出发布前还缺哪些人工确认 |
 
 ### Agent 会在哪里停下来等你
+- **A0**：游戏名搜出多个候选包名、包名/版本与描述不符、来源可疑 → 由负责人确认，Agent 不自选
 - **S0**：输入检查表和 scope.md——权属状态登记、授权范围逐项勾选、**P0 检索结论**，**没勾的事 Agent 不做**。
 - **S1 结束**：源码可恢复性结论（决定走 R1/R2/R3）。
 - **S2 结束**：docs/01 + 09 过目。
@@ -153,7 +178,7 @@ powershell -ExecutionPolicy Bypass -File Y:\Skills\apk-rebuild-skills\install\in
 
 ```
 skills/<skill>/SKILL.md          技能本体（Agent 读这个）
-skills/<skill>/references/       模板、速查表、引擎手册、prior-art / rea-integration（按需加载）
+skills/<skill>/references/       模板、速查表、引擎手册、prior-art / rea-integration / artifact-acquisition（按需加载）
 skills/<skill>/scripts/          参数化脚本，不含路径和密钥
 templates/project/               新项目骨架（scope、task_spec、待优化清单）
 docs/SOP.md                      给人读的完整 SOP（八阶段 S0–S7）

@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.4.1 — 2026-11-09
+
+**A0 原包获取：把「第一步」固化下来**（用户要求：从指定来源下载 APK；已提供 APK 就直接进流程；输入可为游戏名 / Google Play 链接 / 三方市场链接）。定位为补丁版：**八阶段 S0–S7、七条铁律、决策门 D1–D9、G-PUBLISH 一律不变**。
+
+- 新增 `skills/rebuild-workflow/scripts/fetch_artifact.py`：四种输入 `--from-file` / `--name`（配 `--pick N`）/ `--play-url` / `--market-url`；参数化输出目录、代理、Chrome；自动校验文件头与大小、算 sha256、写 `input/artifact-source.json`；输出机器可读 JSON 状态（ok / need-confirm / need-input / failed）。由 2026-09 六个 APK 实战脚本改写，去掉硬编码项目名、E 盘路径、Chrome 151 与 7897 代理。
+- 新增 `skills/rebuild-workflow/references/artifact-acquisition.md`：A0 决策树、四种输入命令、源优先级（APKCombo downloader → 变体页 → APKPure）与失败降级、校验留痕、人工确认点、合规边界（不绕过付费/登录/区域限制/反爬）、常见坑。
+- `rebuild-workflow` **1.4.1**：新增 A0 章节（不占 S 编号）、S0 步骤 0、A0 人工确认点；frontmatter 描述补四种输入。
+- `input-checklist.md` #1 改为 A0 产出并新增 A0 前置动作小节；`templates/project/scope.md` 加「原包来源（A0）」字段与检查表结果行；`stage-map.md` 入口图、产物表、门禁一览同步。
+- `docs/SOP.md` **v1.4.1**：总流程前加 A0，S0 标题由「授权立项」修正为「立项登记」，输入表与产出物同步；`docs/ARCHITECTURE.md` 分层图、流程图、门禁表、仓库结构对应表加 A0。
+- `README.md`：新增「第一步：获取原包（A0）」章节、四种输入命令、前置环境、常用说法、Agent 停顿点；架构总览简图入口加 A0；版本表与架构链接同步。
+- **验证状态**：`py_compile` 通过、`--help` 正常、`--from-file` 本地包路径冒烟通过（校验 + sha256 + 留痕）；**网络下载三条路线未在新站点结构下逐一复测**（🟡），选择器失效时按 `artifact-acquisition.md` 降级并回写。
+
 ## v1.4.0 — 2026-11-09
 
 **合规模型重构 + 现成成果能力接入 + 基线统一。** 来源：用户决定「允许所有作品进入流程，正式发布由人工逐产品确认所有权并人工操作」，以及 `outputs/开源项目落地评估与流程演进分析.md` 的 B0–B4 方案。

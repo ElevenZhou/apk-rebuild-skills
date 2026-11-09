@@ -1,7 +1,7 @@
 ---
 name: rebuild-workflow
-description: 任意作品（自有 / 第三方 / 权属待确认）的“安装包 → REA 逆向取证 → 重建 → 再开发 → 交付工程+试玩包”全流程总控。接手只有安装包、需要方法级静态分析、真机采证和可维护新工程的任务时使用；负责权属登记、阶段、决策门、出口标准和发布门禁，并调度 rebuild-* 与 REA。正式发布前必须逐产品人工确认所有权，由人工执行发布，Agent 不得自动发布。
-version: 1.4.0
+description: 任意作品（自有 / 第三方 / 权属待确认）的“安装包 → REA 逆向取证 → 重建 → 再开发 → 交付工程+试玩包”全流程总控。接手只有安装包、需要方法级静态分析、真机采证和可维护新工程的任务时使用；负责权属登记、阶段、决策门、出口标准和发布门禁，并调度 rebuild-* 与 REA。正式发布前必须逐产品人工确认所有权，由人工执行发布，Agent 不得自动发布。输入可为本地 APK / 游戏名 / Google Play 链接 / 三方市场链接，A0 负责获取原包。
+version: 1.4.1
 owner: ElevenZhou
 ---
 
@@ -29,6 +29,24 @@ owner: ElevenZhou
 
 - **用**：任意作品，只剩 APK/XAPK/EXE，需要分析结构、重建成可维护新工程，并最终交付「工程源码 + 试玩 APK」；或只需竞品研究抽象 / 取证。
 - **不用**：只需改一个资源/文案的小修补 → 用 `rebuild-asset-recovery`；只需打包 → 用 `rebuild-build-release`。
+
+## A0 原包获取（流程第一步，不占 S 阶段编号）
+
+**有包就进，没包才下。** A0 的产出就是输入检查表 **#1 原包 + sha256**；细则见 [references/artifact-acquisition.md](references/artifact-acquisition.md)，脚本 `scripts/fetch_artifact.py`。
+
+| 用户给的 | 动作 |
+|---|---|
+| 本地 APK/XAPK/EXE 路径 | **不下载**：校验 + 归档 + 登记来源 → 直接进 S0 |
+| 游戏名 | 搜候选包名 → **人工确认**（同名产品多，Agent 不得自选）→ 下载 |
+| Google Play 详情页链接 | 提取 `?id=` 包名 → 走公开镜像下载（Play 不提供 APK 直链） |
+| 三方市场下载页 / 直链 | 直接下载（APKPure / APKCombo / APKMirror 等） |
+
+```bash
+python scripts/fetch_artifact.py --play-url "https://play.google.com/store/apps/details?id=com.foo.game" --out "项目X/input"
+# 另有 --from-file / --name（配 --pick N）/ --market-url，见细则
+```
+
+A0 出口：文件头合法且 >1MB、`sha256` 写入 scope.md、`input/artifact-source.json` 留痕、商店页链接记入 #6。**付费 / 需登录 / 区域受限应用不自动下载**，由负责人用 `--from-file` 提供已合法取得的包体；不绕过反爬、验证码或会员墙。A0 不改变八阶段编号、铁律、决策门与 G-PUBLISH。
 
 ## 八阶段总流程（严格按序，每阶段有出口标准）
 
@@ -80,6 +98,7 @@ P 层用到的外部能力（按 `prior-art.md` 的准入清单）：
 
 ## S0 操作步骤
 
+0. **先执行 A0 原包获取**（`artifact-acquisition.md`）：本地已提供 APK → 跳过下载直接进本步；否则按游戏名 / Play 链接 / 三方市场链接下载并校验，产出 `input/artifact-source.json`。
 1. 用 `references/input-checklist.md` 逐项收集输入（必需 7 项 + 后续 4 项），缺项写入 scope.md「开工风险」；先按其中「环境前置」自查一遍。
 2. **登记权属状态**（自有已确认 / 自有待确认 / 第三方 / 未知），不因"第三方"或"待确认"拒绝开工。
 3. 复制仓库 `templates/project/` 到 `项目X/`，填写 `scope.md`、`task_spec.yaml`（含 `prior_art` 与「发布授权」段）。
@@ -100,6 +119,7 @@ P 层用到的外部能力（按 `prior-art.md` 的准入清单）：
 
 ## 人工决策门（Agent 必须暂停等人确认，不得自行跳过）
 
+- **A0**：游戏名搜出多个候选包名、包名/版本与描述不符、来源可疑时，等人确认，不得自选
 - S0 结束：scope.md 确认（含权属状态、P0 结论）
 - S2 结束：docs/01 + 09 过目
 - S1 结束：源码可恢复性结论（决定后续走 R1 还是 R2/R3）
@@ -135,6 +155,7 @@ P 层用到的外部能力（按 `prior-art.md` 的准入清单）：
 `rebuild-recon` · `rebuild-asset-recovery` · `rebuild-product-design` · `rebuild-dev-milestones` · `rebuild-device-evidence` · `rebuild-build-release`
 
 ## 变更记录
+- 1.4.1（2026-11-09）新增 **A0 原包获取**：本地包直接进 S0；游戏名 / Google Play 链接 / 三方市场链接由 `fetch_artifact.py` 下载并留痕；新增 `artifact-acquisition.md`；不改八阶段编号、铁律、门禁。
 - 1.4.0（2026-11-09）合规模型改为「分析放行 / 发布管控」：允许所有作品进入流程，权属改为状态登记；新增 **G-PUBLISH 发布人工门禁**（逐产品人工确认所有权、人工发布）；新增 P0/P4 横切检查点与 `prior-art.md` 外部能力清单；铁律扩为七条；置信度体系加 external-reference 旁证；S0/S7 出口同步。
 - 1.3.0（2026-10-17）新增 REA 联合模式：统一逆向证据、Evidence 归档、ADB 真机证据、R1/R2/R3 决策和第三方 APK 权属边界；详见 `references/rea-integration.md`。
 - 1.2.0（2026-10-16）输入检查表分必需/后续两类（C/S 型 #10 必需）；铁律 1 明确未勾选即未授权；S1 出口加源码可恢复性结论；既有门禁以严者为准；决策门扩到 D9；S3/S6/S7 出口同步（项目 C、F 反馈）。
