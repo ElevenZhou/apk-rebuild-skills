@@ -1,7 +1,7 @@
 ---
 name: rebuild-asset-recovery
 description: 逆向重建 S3 资源回导：从自有安装包解包产物中恢复可编辑的美术/音频/字体/动画/文案资源，遵循"样品先行 → 批量 → 报告 → 原件不动"规则。内置 Godot 4.x 全套无 GDRE 依赖回导脚本（ctex→png、oggvorbisstr→ogg、fontdata→ttf、spatlas/spskel→Spine）；其他引擎给出通用流程与候选工具。由原 godot-asset-recovery 迁入。触发词：资源回导、提取素材、ctex、oggvorbisstr、spine 导出、恢复美术资源。
-version: 1.3.0
+version: 1.3.1
 owner: ElevenZhou
 ---
 
@@ -55,6 +55,7 @@ python scripts/godot/spine_batch.py <imported_dir> <out_dir>/spine <report.txt>
 6. libogg 会**静默丢弃** CRC 错误的页 → 解析失败先查 CRC。
 
 ### 其他 Godot 注意
+- 大小写不敏感文件系统：`Rainbow.png` 与 `rainbow.png` 会指向同一目标；回导目标名按小写去重，hash 冲突继续追加序号。必须核对报告成功数与实际独立文件数；ctex→PNG 标 `OK_RECOMP`，不标字节一致。
 - `.etc2.ctex`（移动端压缩）：✅ 桌面 Godot 4.6 可以 `get_image()` + `decompress()` 正常导出（项目 D 582/582）。文件名多一层 `.etc2` 后缀，脚本按最后一个 `-` 切分去掉 hash。
 - `.fontdata` 若引用了其他字体作为 fallback（如 `res://assets/fonts/xxx.ttf`），单独加载会因依赖缺失失败 → 报告里记为 FAIL，从其他导出的字体手工补齐即可（项目 D 13 个里 1 个）。
 - `.scn` 二进制场景 → GDRE Tools 是首选（`--recover=… --output=…`），D 项目 v2.6.4 CLI 卡死未用。
@@ -86,6 +87,7 @@ python scripts/rn/i18n_extract.py decompiled.js <out>/assets_imported/i18n en:<�
 上游 `rebuild-recon` → 下游 `rebuild-dev-milestones`（M0 骨架引用 assets_imported）、`rebuild-product-design`（换皮时决定哪些资源替换）。
 
 ## 变更记录
+- 1.3.1（2026-11-16）修正 ctex 目标名大小写碰撞覆盖与短 hash 二次碰撞；PNG 转换状态改为 OK_RECOMP。
 - 1.3.0（2026-11-09）出口标准补注：素材版权审查不替代 S7 的 G-PUBLISH 人工所有权确认。
 - 1.2.0（2026-10-16）报告状态统一 OK/OK_RECOMP/PARTIAL/FAIL（PARTIAL 不计 PASS）；新增按类分评、i18n 入样品表、版权/再分发审查并写入出口；Unity AudioClip 用 clip.samples、FSB5 非加密（项目 C/F 复盘 C-6/C-7/C-8/F-7/F-8）。
 - 1.1.0（2026-10-02）新增 React Native/Expo + Hermes 小节与 scripts/rn（项目 C 实测）。

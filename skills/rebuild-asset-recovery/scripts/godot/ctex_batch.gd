@@ -11,10 +11,14 @@ func _dst_name(src_file: String, out_ext: String) -> String:
 	var cut := src_file.rfind("-")
 	var base := src_file.substr(0, cut).get_basename() if cut > 0 else src_file.get_basename()
 	var final := base + "." + out_ext
-	if _used_names.has(final):
+	if _used_names.has(final.to_lower()):
 		var h := src_file.substr(cut + 1, 6)
 		final = base + "_" + h + "." + out_ext
-	_used_names[final] = true
+		var collision_index := 2
+		while _used_names.has(final.to_lower()):
+			final = base + "_" + h + "_" + str(collision_index) + "." + out_ext
+			collision_index += 1
+	_used_names[final.to_lower()] = true
 	return final
 
 
@@ -63,7 +67,7 @@ func _init() -> void:
 					var err := img.save_png(dst)
 					if err == OK:
 						ok_ctex += 1
-						lines.append("OK\tctex\t%s\t-> %s %dx%d" % [fname, dst.get_file(), img.get_width(), img.get_height()])
+						lines.append("OK_RECOMP\tctex\t%s\t-> %s %dx%d" % [fname, dst.get_file(), img.get_width(), img.get_height()])
 					else:
 						fail_ctex += 1
 						lines.append("FAIL\tctex\t%s\t(save err=%d)" % [fname, err])
